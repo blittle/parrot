@@ -72,6 +72,9 @@ export const clipsDb = {
   async has(hash: string): Promise<boolean> {
     return (await run<IDBValidKey | undefined>("clips", "readonly", (s) => s.getKey(hash))) !== undefined;
   },
+  async delete(hash: string): Promise<void> {
+    await run("clips", "readwrite", (s) => s.delete(hash));
+  },
   count: () => run<number>("clips", "readonly", (s) => s.count()),
   async clear(): Promise<void> {
     await run("clips", "readwrite", (s) => s.clear());

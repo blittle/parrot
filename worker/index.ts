@@ -112,11 +112,20 @@ const VOICES_TTL_MS = 24 * 60 * 60 * 1000;
 async function cachedVoices(env: Env, lang: string) {
   const key = `voices/${lang}.json`;
   const stored = await env.AUDIO.get(key);
+  let stale: Awaited<ReturnType<typeof listVoices>> | undefined;
   if (stored) {
     const { at, voices } = (await stored.json()) as { at: number; voices: Awaited<ReturnType<typeof listVoices>> };
     if (Date.now() - at < VOICES_TTL_MS) return voices;
+    stale = voices;
   }
-  const voices = await listVoices(lang, env.GOOGLE_TTS_API_KEY!);
+  let voices: Awaited<ReturnType<typeof listVoices>>;
+  try {
+    voices = await listVoices(lang, env.GOOGLE_TTS_API_KEY!);
+  } catch (err) {
+    // Google hiccup or quota: an old list is far better than an error.
+    if (stale) return stale;
+    throw err;
+  }
   await env.AUDIO.put(key, JSON.stringify({ at: Date.now(), voices }), { httpMetadata: { contentType: "application/json" } });
   return voices;
 }

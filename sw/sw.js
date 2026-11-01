@@ -32,10 +32,9 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    // Network first so updates arrive; the cached shell when offline.
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/", { cacheName: CACHE }).then((r) => r || Response.error())),
-    );
+    // Network first so updates arrive. Offline, or a connection too slow to answer
+    // within a few seconds (a weak signal), opens the cached app instead of hanging.
+    event.respondWith(navigate(request));
     return;
   }
 
@@ -54,3 +53,20 @@ self.addEventListener("fetch", (event) => {
     ),
   );
 });
+
+const NAVIGATION_TIMEOUT_MS = 3500;
+
+async function navigate(request) {
+  const network = fetch(request);
+  network.catch(() => {}); // A late failure after we've fallen back is fine.
+  const timeout = new Promise((resolve) => setTimeout(resolve, NAVIGATION_TIMEOUT_MS, "timeout"));
+  try {
+    const first = await Promise.race([network, timeout]);
+    if (first !== "timeout") return first;
+    const cached = await caches.match("/", { cacheName: CACHE });
+    return cached || (await network);
+  } catch {
+    const cached = await caches.match("/", { cacheName: CACHE });
+    return cached || Response.error();
+  }
+}

@@ -210,6 +210,7 @@ On your phone, where Parrot is meant to be used:
 | "No allowed emails are configured" | `ALLOWED_EMAILS` not set | `npx wrangler secret put ALLOWED_EMAILS` |
 | "Cloudflare sign-in is restricted to members of the account" | The app only offers Cloudflare-account login | Add **One-time PIN** as a login method (step 4) |
 | "Google's per-minute limit reached" or "usage limit is still reached" | A Text-to-Speech quota was hit, usually "Count of requests for Chirp3-HD voices per minute" (200 by default). Parrot paces itself to ~180 requests a minute, waits and retries, and lets you practice the words already downloaded | Google Cloud → **IAM & Admin → Quotas & System Limits** → filter "Text-to-Speech" → select the metric near 100% → **Edit quota**. Needs a paid billing account |
+| "Your sign-in has expired. Tap to sign in again." | The Cloudflare Access session ran out (common in the installed app after a few weeks) | Tap the banner, or reopen the app while online, and sign in; downloaded lists keep playing meanwhile |
 | "This account is not allowed" | Signed in with an email missing from `ALLOWED_EMAILS` | Add it there and in the Access policy |
 | "Invalid Cloudflare Access token" | `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match the Access application | Re-copy the AUD tag (Step 4, "Lost the values?"); the domain is only `<team>.cloudflareaccess.com` |
 | "The Cloud Text-to-Speech API isn't enabled" | API not enabled in the key's Google project | Google Cloud → APIs & Services → Library → enable it |

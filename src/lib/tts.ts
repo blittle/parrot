@@ -3,7 +3,7 @@ import { cacheKey } from "../../shared/cache-key";
 import { GoogleTtsError, listVoices as googleListVoices, synthesize as googleSynthesize } from "../../shared/google";
 import { clipsDb } from "./db";
 import { validateTtsRequest } from "../../shared/validate";
-import { HttpError, isRateLimit, OfflineError, PendingError, QuotaError, withRetry } from "./retry";
+import { HttpError, isRateLimit, OfflineError, PendingError, QuotaError, SignInError, withRetry } from "./retry";
 import { getSettings, updateSettings } from "./settings";
 
 export type Mode = "own-key" | "server";
@@ -21,6 +21,11 @@ function explain(err: unknown, mode: Mode): Error {
   if (mode === "server" && /Cloudflare Access|Unauthorized|401/.test(message)) {
     return new Error("No API key set. Add your own Google API key in Settings, or sign in to the Parrot server.");
   }
+  if (err instanceof SignInError) return err;
+  // In server mode the Google key is the server's, not something to fix in Settings.
+  if (mode === "server" && /API key not valid|API_KEY_INVALID|has not been used|is disabled|billing/i.test(message)) {
+    return new Error(`The Parrot server's Google key isn't working (${message}). Check GOOGLE_TTS_API_KEY in Cloudflare.`);
+  }
   if (err instanceof GoogleTtsError) {
     if (/has not been used|is disabled|SERVICE_DISABLED/i.test(message)) {
       return new Error("The Cloud Text-to-Speech API isn't enabled for this key's project. Enable it in the Google Cloud console.");
@@ -35,8 +40,30 @@ function explain(err: unknown, mode: Mode): Error {
   return err instanceof Error ? err : new Error(message);
 }
 
+const SIGNED_OUT = "Your sign-in has expired. Reload Parrot to sign in again.";
+
+/**
+ * Fetches from the Parrot server without following redirects: when the
+ * Cloudflare Access login expires, the server answers with a redirect to the
+ * login page, which would otherwise surface as a confusing network error.
+ */
+async function serverFetch(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(path, { ...init, redirect: "manual" });
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) throw new SignInError(SIGNED_OUT);
+  return res;
+}
+
+/** Checks the server: "ok", "signed-out" (login expired), or "unavailable". */
+export async function serverStatus(): Promise<"ok" | "signed-out" | "unavailable"> {
+  try {
+    return (await serverFetch("/api/health")).ok ? "ok" : "unavailable";
+  } catch (err) {
+    return err instanceof SignInError ? "signed-out" : "unavailable";
+  }
+}
+
 async function serverCall<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
+  const res = await serverFetch(path, init);
   const body = (await res.json().catch(() => null)) as T | ApiError | null;
   if (!res.ok) throw new HttpError((body as ApiError | null)?.error ?? `Request failed (${res.status})`, res.status);
   return body as T;
@@ -142,6 +169,11 @@ const MIN_REQUEST_GAP_MS = 330;
 let nextRequestAt = 0;
 
 /** Waits for this client's next request slot. */
+/** Gives back a slot when the request turned out not to reach Google (a server cache hit). */
+function refundRequest(): void {
+  nextRequestAt = Math.max(Date.now(), nextRequestAt - MIN_REQUEST_GAP_MS);
+}
+
 function paceRequest(): Promise<void> {
   const now = Date.now();
   const at = Math.max(now, nextRequestAt);
@@ -189,17 +221,27 @@ export async function getClip(raw: Required<TtsRequest>, { onWait, retry = true 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(req),
         });
-        const audio = await fetch(res.url);
+        // Served from the server's R2 cache: Google wasn't called, so don't slow the next one.
+        if (res.cached) refundRequest();
+        const audio = await serverFetch(res.url);
         if (!audio.ok) throw new HttpError(`Could not download audio (${audio.status})`, audio.status);
         return audio.blob();
       }, { onWait, delays: retry ? undefined : [] });
     } catch (err) {
+      if (err instanceof SignInError) throw err;
       if (!navigator.onLine || err instanceof TypeError) {
         throw new OfflineError("Some audio isn't downloaded yet, and you're offline. Connect once to download it.");
       }
       throw explain(err, mode);
     }
-    await clipsDb.put(hash, blob);
+    try {
+      await clipsDb.put(hash, blob);
+    } catch (err) {
+      if ((err as DOMException)?.name === "QuotaExceededError") {
+        throw new Error("This device is out of space for Parrot's audio. Free up some space, or clear saved audio in Settings.");
+      }
+      throw err;
+    }
     return { hash, blob, cached: false };
   })().finally(() => inflight.delete(hash));
 
@@ -276,7 +318,7 @@ export async function getClipsSettled(
       } catch (err) {
         failed.add(i);
         error ??= err;
-        if (err instanceof QuotaError || err instanceof OfflineError) stop = true;
+        if (err instanceof QuotaError || err instanceof OfflineError || err instanceof SignInError) stop = true;
       }
       onProgress(++done, reqs.length);
     }

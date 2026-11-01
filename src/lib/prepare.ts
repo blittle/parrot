@@ -1,7 +1,7 @@
 import type { TtsRequest } from "../../shared/api";
 import { clipsDb } from "./db";
 import type { RenderProgress } from "./render";
-import { isRateLimit, OfflineError, PendingError } from "./retry";
+import { isRateLimit, OfflineError, PendingError, SignInError } from "./retry";
 import { keepSlots, uniqueClips, type Plan } from "./sequence";
 import { clipKey, getClipsSettled } from "./tts";
 
@@ -13,7 +13,7 @@ export interface PreparedPlan {
   /** Distinct words kept. */
   keptWords: number;
   /** Why words were left out. */
-  reason?: "quota" | "downloading" | "offline" | "error";
+  reason?: "quota" | "downloading" | "offline" | "signin" | "error";
   error?: unknown;
 }
 
@@ -69,7 +69,9 @@ export async function preparePlan(plan: Plan, onProgress: (p: RenderProgress) =>
             ? "downloading"
             : error instanceof OfflineError
               ? "offline"
-              : "error",
+              : error instanceof SignInError
+                ? "signin"
+                : "error",
     error: skipped.size === 0 ? undefined : error,
   };
 }

@@ -22,7 +22,12 @@ let jwksDomain: string | undefined;
  * Fails closed: if Access or the allowlist isn't configured, every request is rejected.
  */
 export async function checkAccess(request: Request, env: AuthEnv): Promise<string | null> {
-  if (env.AUTH_DISABLED === "true") return null;
+  // The local-development switch only works on this machine, so setting it in
+  // production by mistake can't open the API to the internet.
+  if (env.AUTH_DISABLED === "true") {
+    const host = new URL(request.url).hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return null;
+  }
 
   const team = env.ACCESS_TEAM_DOMAIN;
   const aud = env.ACCESS_AUD;

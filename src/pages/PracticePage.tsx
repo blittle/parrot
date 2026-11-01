@@ -129,6 +129,8 @@ export function PracticePage({ listId }: { listId?: string }) {
             ? `The other ${partial.skippedWords} aren't downloaded yet; connect to the internet to get them.`
             : partial.reason === "quota"
               ? `The other ${partial.skippedWords} are still downloading (Google's per-minute limit) and will be in your next session.`
+              : partial.reason === "signin"
+                ? `Your sign-in has expired, so the other ${partial.skippedWords} couldn't download. Reload Parrot to sign in again.`
               : partial.reason === "downloading"
                 ? `The other ${partial.skippedWords} are still downloading and will be in your next session.`
                 : `The other ${partial.skippedWords} couldn't be downloaded right now and will be retried.`}

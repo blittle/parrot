@@ -18,6 +18,9 @@ export class QuotaError extends Error {
 /** A clip is being downloaded in the background (maybe waiting on the quota), not ready yet. */
 export class PendingError extends Error {}
 
+/** The Cloudflare Access login expired: the server redirected to the login page. */
+export class SignInError extends Error {}
+
 /** A clip isn't saved on this device and there's no connection to fetch it. */
 export class OfflineError extends Error {}
 

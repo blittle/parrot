@@ -63,7 +63,11 @@ describe("checkAccess", () => {
     expect(await checkAccess(req(jwt), { ...env, ALLOWED_EMAILS: undefined })).toBe("No allowed emails are configured");
   });
 
-  it("can be disabled for local development", async () => {
-    expect(await checkAccess(req(), { AUTH_DISABLED: "true" })).toBeNull();
+  it("can be disabled for local development only", async () => {
+    const local = new Request("http://localhost:5173/api/voices");
+    expect(await checkAccess(local, { AUTH_DISABLED: "true" })).toBeNull();
+    // Set in production by mistake: still requires a valid login.
+    expect(await checkAccess(req(), { ...env, AUTH_DISABLED: "true" })).toBe("Missing Cloudflare Access token");
+    expect(await checkAccess(req(), { AUTH_DISABLED: "true" })).toBe("Cloudflare Access is not configured");
   });
 });

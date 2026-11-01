@@ -1,4 +1,5 @@
 import type { Plan } from "./sequence";
+import { clipsDb } from "./db";
 import { clipKey, getClips } from "./tts";
 import { WAV_HEADER_BYTES, wavHeader, writeSamples } from "./wav";
 
@@ -38,7 +39,14 @@ export async function renderSession(plan: Plan, onProgress: (p: RenderProgress) 
   const decoded = new Map<string, Float32Array>();
   for (const clip of clips) {
     if (decoded.has(clip.hash)) continue;
-    const buffer = await decoder.decodeAudioData(await clip.blob.arrayBuffer());
+    let buffer: AudioBuffer;
+    try {
+      buffer = await decoder.decodeAudioData(await clip.blob.arrayBuffer());
+    } catch {
+      // A damaged clip would break every session that uses it: remove it so it re-downloads.
+      await clipsDb.delete(clip.hash).catch(() => {});
+      throw new Error("A saved clip was damaged and has been removed. Start the session again to download it fresh.");
+    }
     decoded.set(clip.hash, mixToMono(buffer));
   }
 

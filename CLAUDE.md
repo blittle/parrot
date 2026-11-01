@@ -14,6 +14,8 @@ Both share the same cache key, so clips are interchangeable. Clips are cached in
 - Mobile first: design for a ~390 px phone, then adapt up (`@media (min-width: 760px)`). Touch targets ≥ 44 px, inputs 16 px. Check 320 px has no horizontal scroll.
 - Installable PWA. `sw/sw.js` is a template; the `serviceWorker` plugin in `vite.config.ts` fills in the precache list at build time. Only active in production builds (`vite preview` to test).
 - Anything needed to practice must work offline: clips in IndexedDB, voices cached in localStorage, last session in IndexedDB. Never make playback depend on the network.
+- Calls to the Parrot server go through `serverFetch` (`redirect: "manual"`): an expired Cloudflare Access login shows up as a redirect, which must become "sign in again", not "you're offline".
+- Never spend Google quota without need: clips are keyed by the normalized request (`clipKey`), the auto-picked voice is pinned in settings, voice lists are cached (device 7 days, R2 1 day), and the startup check uses `/api/health`, which never calls Google.
 - `useEffect` callbacks must not return values (use braces): newer Chrome returns a Promise from `scrollTo`, which crashed React.
 
 ## Personality
