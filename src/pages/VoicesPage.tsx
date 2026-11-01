@@ -3,6 +3,7 @@ import type { Voice } from "../../shared/api";
 import { ALL_LANGUAGES } from "../lib/languages";
 import { updateSettings, useSettings } from "../lib/settings";
 import { familyRank, getClip, listVoices, resolveVoice } from "../lib/tts";
+import { speakerName } from "../components/VoiceSelect";
 
 // Phrases that tend to trip up TTS, per language.
 const SAMPLES: Record<string, string[]> = {
@@ -152,7 +153,7 @@ export function VoicesPage() {
           <ul>
             {list.map((v) => {
               const row = rows[v.name] ?? { status: "idle" };
-              const speaker = v.name.slice(`${languageCode}-${family}-`.length) || v.name;
+              const speaker = speakerName(v);
               const isDefault = v.name === defaultVoice;
               return (
                 <li key={v.name}>

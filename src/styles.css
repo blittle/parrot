@@ -132,7 +132,7 @@ textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.85rem
 .grid-2.end { align-items: end; }
 
 .input-row { display: flex; gap: 8px; }
-.input-row input { flex: 1; }
+.input-row input, .input-row select { flex: 1; }
 
 .toggle { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; }
 

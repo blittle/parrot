@@ -5,6 +5,8 @@ import { navigate, href } from "../lib/router";
 import { buildPlan, DEFAULT_OPTIONS, PRESETS, selectWords, type Plan, type Sequence, type SessionOptions, type Step } from "../lib/sequence";
 import { resolveVoice } from "../lib/tts";
 import type { WordList } from "../lib/types";
+import { VoiceSelect } from "../components/VoiceSelect";
+import { spokenTerm } from "../lib/text";
 import { Player } from "./Player";
 
 const PRACTICE_KEY = "parrot:practice";
@@ -60,6 +62,7 @@ export function PracticePage({ listId }: { listId?: string }) {
   const setOptions = (patch: Partial<SessionOptions>) => update({ options: { ...options, ...patch } });
   const setSteps = (steps: Step[]) => update({ sequence: { ...sequence, id: "custom", steps } });
 
+  const usesTranslation = sequence.steps.some((s) => s.type === "translation");
   const selectedCount = list ? selectWords(list.words, options).length : 0;
   const estimate = useMemo(() => {
     if (!list) return 0;
@@ -74,7 +77,6 @@ export function PracticePage({ listId }: { listId?: string }) {
     if (estimate > 90 * 60 && !confirm(`This session is about ${formatDuration(estimate)} long. Continue?`)) return;
     try {
       setProgress({ phase: "audio", done: 0, total: 0 });
-      const usesTranslation = sequence.steps.some((s) => s.type === "translation");
       const [term, translation] = await Promise.all([
         resolveVoice(list.languageCode),
         usesTranslation ? resolveVoice(list.translationLanguageCode) : Promise.resolve(""),
@@ -120,6 +122,29 @@ export function PracticePage({ listId }: { listId?: string }) {
             ))}
           </select>
         </label>
+
+        {list && (
+          <>
+            <h2>Voices</h2>
+            <div className="grid-2">
+              <VoiceSelect
+                languageCode={list.languageCode}
+                label="Word voice"
+                sampleText={list.words[0] ? spokenTerm(list.words[0], list.languageCode) : ""}
+              />
+              {usesTranslation && (
+                <VoiceSelect
+                  languageCode={list.translationLanguageCode}
+                  label="Translation voice"
+                  sampleText={list.words.find((w) => w.translation)?.translation ?? ""}
+                />
+              )}
+            </div>
+            <p className="muted small">
+              Saved for each language. <a href={href("voices")}>Compare all voices</a>
+            </p>
+          </>
+        )}
 
         <h2>Sequence</h2>
         <div className="presets">
