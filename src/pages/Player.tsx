@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RenderedSession } from "../lib/render";
 import type { Plan } from "../lib/sequence";
 import { displayTerm } from "../lib/text";
@@ -14,11 +14,16 @@ interface Props {
 export function Player({ rendered, plan, list, title }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
   const panel = useRef<HTMLElement>(null);
-  const url = useMemo(() => URL.createObjectURL(rendered.wav), [rendered.wav]);
+  const [url, setUrl] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [showTranslation, setShowTranslation] = useState(true);
 
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // Create and revoke the object URL in one effect so StrictMode's double run can't revoke a URL still in use.
+  useEffect(() => {
+    const next = URL.createObjectURL(rendered.wav);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [rendered.wav]);
 
   // On phones the Build button is far below the player, so bring the player into view.
   useEffect(() => {
@@ -104,7 +109,7 @@ export function Player({ rendered, plan, list, title }: Props) {
 
       <audio
         ref={audio}
-        src={url}
+        src={url ?? undefined}
         controls
         autoPlay
         onTimeUpdate={(e) => {
@@ -124,7 +129,7 @@ export function Player({ rendered, plan, list, title }: Props) {
           <input type="checkbox" checked={showTranslation} onChange={(e) => setShowTranslation(e.target.checked)} />
           Show translation
         </label>
-        <a className="button" href={url} download={fileName}>
+        <a className="button" href={url ?? undefined} download={fileName}>
           Download ({sizeMb} MB)
         </a>
       </div>

@@ -61,8 +61,6 @@ Worker
 - Download a session as WAV. MP3 would be about 10x smaller but needs an encoder (e.g. lamejs).
 
 ### 4. Later
-- Verify against real Google voices: does Chirp 3 HD accept `speakingRate`? If not, use
-  another family for slow steps, or slow down with longer pauses instead.
 - Export a list back to CSV.
 - Lists synced across devices (D1).
 - Mark words as known; spaced repetition ordering.
@@ -72,4 +70,6 @@ Worker
 
 ## Open questions
 - Which voice family wins for single words vs. sentences? (Answer with the spike.)
+- Answered: Chirp 3 HD accepts `speakingRate` (0.8x makes a sentence about 40% longer), and Google's
+  MP3 output is 24 kHz mono, matching the renderer. de-DE has 42 voices, 30 of them Chirp 3 HD.
 - Is the slow version better as a lower `speakingRate` or as the same clip with longer pauses?
