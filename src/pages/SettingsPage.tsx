@@ -26,7 +26,8 @@ export function SettingsPage({ serverOk }: { serverOk: boolean | null }) {
     setTest(null);
     if (!draft.trim()) return;
     try {
-      const voices = await listVoices("de-DE");
+      // A real request, so it actually tests the key (not the saved voice list).
+      const voices = await listVoices("de-DE", { refresh: true });
       setTest({ ok: true, message: `Key works. ${voices.length} German voices available.` });
     } catch (e) {
       setTest({ ok: false, message: (e as Error).message });

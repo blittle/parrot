@@ -2,8 +2,9 @@ import type { ApiError, TtsRequest, TtsResponse, Voice, VoicesResponse } from ".
 import { cacheKey } from "../../shared/cache-key";
 import { GoogleTtsError, listVoices as googleListVoices, synthesize as googleSynthesize } from "../../shared/google";
 import { clipsDb } from "./db";
+import { validateTtsRequest } from "../../shared/validate";
 import { HttpError, isRateLimit, OfflineError, PendingError, QuotaError, withRetry } from "./retry";
-import { getSettings } from "./settings";
+import { getSettings, updateSettings } from "./settings";
 
 export type Mode = "own-key" | "server";
 
@@ -43,9 +44,21 @@ async function serverCall<T>(path: string, init?: RequestInit): Promise<T> {
 
 const voiceCache = new Map<string, Promise<Voice[]>>();
 
-function storedVoices(languageCode: string): Voice[] | null {
+// Google's voice list rarely changes; refetching it on every app open would
+// spend quota ("All requests per minute") for nothing.
+export const VOICES_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface StoredVoices {
+  at: number;
+  voices: Voice[];
+}
+
+function storedVoices(languageCode: string): StoredVoices | null {
   try {
-    return JSON.parse(localStorage.getItem(`parrot:voices:${languageCode}`) ?? "null") as Voice[] | null;
+    const raw = JSON.parse(localStorage.getItem(`parrot:voices:${languageCode}`) ?? "null") as StoredVoices | Voice[] | null;
+    if (!raw) return null;
+    // Older versions stored a bare array: usable offline, but treated as stale.
+    return Array.isArray(raw) ? { at: 0, voices: raw } : raw;
   } catch {
     return null;
   }
@@ -53,17 +66,25 @@ function storedVoices(languageCode: string): Voice[] | null {
 
 function storeVoices(languageCode: string, voices: Voice[]): void {
   try {
-    localStorage.setItem(`parrot:voices:${languageCode}`, JSON.stringify(voices));
+    localStorage.setItem(`parrot:voices:${languageCode}`, JSON.stringify({ at: Date.now(), voices } satisfies StoredVoices));
   } catch {
-    // Not critical: only needed offline.
+    // Not critical: only saves a request next time.
   }
 }
 
-/** Google's voices for a language. Falls back to the last list seen, so it works offline. */
-export function listVoices(languageCode: string): Promise<Voice[]> {
+/**
+ * Google's voices for a language. Uses the copy saved on this device when it's
+ * under a week old (`refresh` forces a new one), and falls back to any saved
+ * copy when offline.
+ */
+export function listVoices(languageCode: string, { refresh = false }: { refresh?: boolean } = {}): Promise<Voice[]> {
   const mode = currentMode();
   const key = `${mode}:${getSettings().apiKey.slice(-6)}:${languageCode}`;
-  let voices = voiceCache.get(key);
+  const saved = storedVoices(languageCode);
+  if (!refresh && saved && Date.now() - saved.at < VOICES_MAX_AGE_MS && saved.voices.length > 0) {
+    return Promise.resolve(saved.voices);
+  }
+  let voices = refresh ? undefined : voiceCache.get(key);
   if (!voices) {
     voices = (
       mode === "own-key"
@@ -77,7 +98,7 @@ export function listVoices(languageCode: string): Promise<Voice[]> {
       (err: unknown) => {
         voiceCache.delete(key);
         const stored = storedVoices(languageCode);
-        if (stored) return stored;
+        if (stored && !refresh) return stored.voices;
         throw explain(err, mode);
       },
     );
@@ -100,7 +121,11 @@ export async function resolveVoice(languageCode: string): Promise<string> {
   if (chosen) return chosen;
   const voices = await listVoices(languageCode);
   if (voices.length === 0) throw new Error(`No Google voices found for ${languageCode}`);
-  return [...voices].sort((a, b) => familyRank(a.family) - familyRank(b.family) || a.name.localeCompare(b.name))[0].name;
+  const best = [...voices].sort((a, b) => familyRank(a.family) - familyRank(b.family) || a.name.localeCompare(b.name))[0].name;
+  // Lock it in: if Google later adds a voice that ranks higher, switching would
+  // silently change every clip's cache key and re-download all your lists.
+  if (!getSettings().voices[languageCode]) updateSettings({ voices: { ...getSettings().voices, [languageCode]: best } });
+  return best;
 }
 
 export interface Clip {
@@ -132,7 +157,12 @@ export interface GetClipOptions {
 }
 
 /** Returns audio for a request: from IndexedDB if we have it, otherwise synthesized and stored. */
-export async function getClip(req: Required<TtsRequest>, { onWait, retry = true }: GetClipOptions = {}): Promise<Clip> {
+export async function getClip(raw: Required<TtsRequest>, { onWait, retry = true }: GetClipOptions = {}): Promise<Clip> {
+  // Normalize exactly like the server (Unicode form, spacing, rounded speed), so the
+  // same words always map to the same cached clip here, in R2 and at Google.
+  const valid = validateTtsRequest(raw);
+  if (!valid.ok) throw new Error(valid.error);
+  const req = valid.value;
   const hash = await cacheKey(req);
   const existing = inflight.get(hash);
   if (existing) {
@@ -254,4 +284,10 @@ export async function getClipsSettled(
 
   await Promise.all(Array.from({ length: Math.min(concurrency, reqs.length) }, worker));
   return { clips, failed, error };
+}
+
+/** The cache key a request is stored under (after the same normalization as getClip). */
+export async function clipKey(req: Required<TtsRequest>): Promise<string> {
+  const valid = validateTtsRequest(req);
+  return cacheKey(valid.ok ? valid.value : req);
 }

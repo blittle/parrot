@@ -29,7 +29,8 @@ export function App() {
   const hasKey = !!settings.apiKey;
   useEffect(() => {
     if (hasKey || !online) return;
-    fetch("/api/voices?lang=de-DE")
+    // /api/health checks the login without calling Google, so opening the app costs no quota.
+    fetch("/api/health")
       .then((r) => setServerOk(r.ok))
       .catch(() => setServerOk(false));
   }, [hasKey, online]);

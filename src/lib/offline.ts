@@ -1,10 +1,9 @@
 import type { TtsRequest } from "../../shared/api";
-import { cacheKey } from "../../shared/cache-key";
 import { clipsDb } from "./db";
 import { loadPractice } from "./practice";
 import { PRESETS, type Sequence, type VoiceChoice } from "./sequence";
 import { spokenTerm, spokenTranslation } from "./text";
-import { getClips, resolveVoice } from "./tts";
+import { clipKey, getClips, resolveVoice } from "./tts";
 import type { WordList } from "./types";
 
 /**
@@ -56,14 +55,14 @@ export interface OfflineStatus {
 
 export async function offlineStatus(list: WordList): Promise<OfflineStatus> {
   const reqs = await requestsFor(list);
-  const present = await Promise.all(reqs.map(async (r) => clipsDb.has(await cacheKey(r))));
+  const present = await Promise.all(reqs.map(async (r) => clipsDb.has(await clipKey(r))));
   return { ready: present.filter(Boolean).length, total: reqs.length };
 }
 
 /** Downloads whatever is missing. Progress counts all clips, including ones already saved. */
 export async function downloadForOffline(list: WordList, onProgress: (status: OfflineStatus) => void): Promise<void> {
   const reqs = await requestsFor(list);
-  const present = await Promise.all(reqs.map(async (r) => clipsDb.has(await cacheKey(r))));
+  const present = await Promise.all(reqs.map(async (r) => clipsDb.has(await clipKey(r))));
   const missing = reqs.filter((_, i) => !present[i]);
   const already = reqs.length - missing.length;
   onProgress({ ready: already, total: reqs.length });

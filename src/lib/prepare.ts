@@ -1,10 +1,9 @@
 import type { TtsRequest } from "../../shared/api";
-import { cacheKey } from "../../shared/cache-key";
 import { clipsDb } from "./db";
 import type { RenderProgress } from "./render";
 import { isRateLimit, OfflineError, PendingError } from "./retry";
 import { keepSlots, uniqueClips, type Plan } from "./sequence";
-import { getClipsSettled } from "./tts";
+import { clipKey, getClipsSettled } from "./tts";
 
 export interface PreparedPlan {
   /** The plan, minus words whose audio isn't available. */
@@ -30,7 +29,7 @@ const reqKey = (req: Required<TtsRequest>) => JSON.stringify(req);
  */
 export async function preparePlan(plan: Plan, onProgress: (p: RenderProgress) => void): Promise<PreparedPlan> {
   const unique = uniqueClips(plan);
-  const hashes = await Promise.all(unique.map((r) => cacheKey(r)));
+  const hashes = await Promise.all(unique.map((r) => clipKey(r)));
   const present = await Promise.all(hashes.map((h) => clipsDb.has(h)));
   const missing = unique.filter((_, i) => !present[i]);
 

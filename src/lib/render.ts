@@ -1,6 +1,5 @@
-import { cacheKey } from "../../shared/cache-key";
 import type { Plan } from "./sequence";
-import { getClips } from "./tts";
+import { clipKey, getClips } from "./tts";
 import { WAV_HEADER_BYTES, wavHeader, writeSamples } from "./wav";
 
 // Google's MP3 output is 24 kHz mono, so render at that rate to avoid resampling.
@@ -43,7 +42,7 @@ export async function renderSession(plan: Plan, onProgress: (p: RenderProgress) 
     decoded.set(clip.hash, mixToMono(buffer));
   }
 
-  const hashes = await Promise.all(reqs.map((r) => cacheKey(r)));
+  const hashes = await Promise.all(reqs.map((r) => clipKey(r)));
   let clipIndex = 0;
   const layout: { slot: number; samples: Float32Array | null; length: number }[] = plan.items.map((item) => {
     if (item.kind === "silence") {

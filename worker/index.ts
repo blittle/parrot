@@ -46,6 +46,11 @@ export default {
 
       if (!env.GOOGLE_TTS_API_KEY) return error("GOOGLE_TTS_API_KEY is not set", 500);
 
+      // GET /api/health  -> signed in and configured; never calls Google
+      if (url.pathname === "/api/health" && request.method === "GET") {
+        return json({ ok: true });
+      }
+
       // POST /api/tts  -> synthesize (or reuse cached) audio
       if (url.pathname === "/api/tts" && request.method === "POST") {
         const body = await request.json().catch(() => null);
@@ -78,7 +83,7 @@ export default {
       if (url.pathname === "/api/voices" && request.method === "GET") {
         const lang = url.searchParams.get("lang") ?? "de-DE";
         if (!LANGUAGE_CODE.test(lang)) return error("lang must look like de-DE", 400);
-        const voices = await listVoices(lang, env.GOOGLE_TTS_API_KEY);
+        const voices = await cachedVoices(env, lang);
         return json({ voices } satisfies VoicesResponse, 200, {
           "Cache-Control": "private, max-age=3600",
         });
@@ -100,3 +105,18 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>;
+
+const VOICES_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Google's voice list, cached in R2 for a day so app opens don't spend quota. */
+async function cachedVoices(env: Env, lang: string) {
+  const key = `voices/${lang}.json`;
+  const stored = await env.AUDIO.get(key);
+  if (stored) {
+    const { at, voices } = (await stored.json()) as { at: number; voices: Awaited<ReturnType<typeof listVoices>> };
+    if (Date.now() - at < VOICES_TTL_MS) return voices;
+  }
+  const voices = await listVoices(lang, env.GOOGLE_TTS_API_KEY!);
+  await env.AUDIO.put(key, JSON.stringify({ at: Date.now(), voices }), { httpMetadata: { contentType: "application/json" } });
+  return voices;
+}

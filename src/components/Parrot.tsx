@@ -23,7 +23,7 @@ export function Parrot({ mood = "idle", size = 96 }: { mood?: ParrotMood; size?:
         <path d="M58 104 v6 M68 104 v6" stroke="#f0a03a" strokeWidth="4" strokeLinecap="round" />
         <g className="parrot-head">
           {/* crest */}
-          <path d="M62 22 Q58 8 66 12 Q66 4 72 12 Q76 6 76 18 Z" fill="#f2c230" />
+          <path d="M62 22 Q58 8 66 12 Q66 4 72 12 Q76 6 76 18 Z" fill="#e2483d" />
           <circle cx="70" cy="40" r="22" fill="#3aa35b" />
           {/* face patch and eye */}
           <ellipse cx="77" cy="38" rx="9" ry="8.5" fill="#ffffff" />
