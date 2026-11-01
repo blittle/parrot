@@ -12,5 +12,6 @@ Both share the same cache key, so clips are interchangeable. Clips are cached in
 
 ## Rules
 - Run `npm test` and `npm run typecheck` before committing.
-- Never commit secrets. The server key lives in `.dev.vars` locally and `wrangler secret` in production.
+- Never commit secrets. The server key lives in `.dev.vars` locally and `wrangler secret` in production. Worker config that varies per deployment (Access domain, AUD, allowed emails) is also a secret, so CI deploys never overwrite it; keep `vars` out of `wrangler.jsonc`.
+- Pushing to `main` deploys to production via GitHub Actions.
 - Keep runtime dependencies few: users paste API keys into this app. `public/_headers` sets a strict CSP; update `connect-src` if a new origin is needed.

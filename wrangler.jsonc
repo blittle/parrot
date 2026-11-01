@@ -8,11 +8,12 @@
     "run_worker_first": ["/api/*"]
   },
   "r2_buckets": [{ "binding": "AUDIO", "bucket_name": "parrot-audio" }],
-  "vars": {
-    // Fill these in after creating the Cloudflare Access application (see README).
-    // The API refuses all requests while they are empty.
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
-  },
+  // Served at parrot.<subdomain>.workers.dev. Preview URLs are off so there is
+  // no second address that Cloudflare Access might not cover.
+  "workers_dev": true,
+  "preview_urls": false,
+  // No "vars": ACCESS_TEAM_DOMAIN, ACCESS_AUD, ALLOWED_EMAILS and
+  // GOOGLE_TTS_API_KEY are all Worker secrets (`wrangler secret put`), so
+  // deploys from CI never overwrite them. The API fails closed until they're set.
   "observability": { "enabled": true }
 }

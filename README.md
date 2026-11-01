@@ -60,39 +60,34 @@ npm run typecheck
 
 ## Deploying to Cloudflare
 
+The full one-time checklist (Google key, Cloudflare account, R2, Access,
+GitHub secrets) is in the deployment checklist doc. In short:
+
 ```sh
 npx wrangler login
 npx wrangler r2 bucket create parrot-audio
 npm run deploy
 ```
 
-That's enough for "own key" mode: anyone can open the site and paste their key.
-
-To also enable server mode:
+That's enough for "own key" mode. For server mode, set the Worker's secrets.
+All four are secrets, not vars, so CI deploys never overwrite them:
 
 ```sh
 npx wrangler secret put GOOGLE_TTS_API_KEY
-npx wrangler secret put ALLOWED_EMAILS   # comma-separated, e.g. you@example.com,friend@example.com
+npx wrangler secret put ALLOWED_EMAILS       # you@example.com,friend@example.com
+npx wrangler secret put ACCESS_TEAM_DOMAIN   # yourteam.cloudflareaccess.com
+npx wrangler secret put ACCESS_AUD           # the Access application's Audience tag
 ```
 
-`ALLOWED_EMAILS` is a secret rather than a var so the addresses stay out of this
-public repo. The Worker checks every request's signed-in email against it, in
-addition to the Access policy below. Keep the two lists in sync.
+Then put the site behind **Cloudflare Access**: in the `parrot` Worker's
+**Settings → Domains & Routes**, enable Access on the `workers.dev` route, and give
+the Access application an Allow policy for the same emails as `ALLOWED_EMAILS`.
+Until all four secrets are set, `/api/*` rejects every request with 401.
 
-Then put the app behind **Cloudflare Access** (Zero Trust, free for up to 50 users):
+### Continuous deployment
 
-1. In the Cloudflare dashboard, open the `parrot` Worker → **Settings → Domains & Routes**
-   and enable Cloudflare Access on the `workers.dev` route (or add a custom domain and
-   create a self-hosted Access application for it under **Zero Trust → Access → Applications**).
-2. Add an **Allow** policy with an **Emails** rule listing the same addresses as `ALLOWED_EMAILS`.
-   Under login methods, the default "One-time PIN" (a code emailed to you) works with any
-   address; add Google as a login method if you'd rather sign in with your Google account.
-3. Copy the application's **Audience (AUD) tag** and your **team domain**
-   (e.g. `yourteam.cloudflareaccess.com`) into `vars` in `wrangler.jsonc`.
-4. `npm run deploy` again.
-
-Until both vars and `ALLOWED_EMAILS` are set, `/api/*` rejects every request with 401, so a
-misconfiguration can't expose the server key. If you want the site public for
-"own key" users but the server private, put Access on `/api/*` only.
-If you use a custom domain, disable the `workers.dev` and preview URLs so Access
-can't be bypassed.
+`.github/workflows/deploy.yml` runs typecheck, tests and build on every pull
+request, and on every push to `main` also deploys with `wrangler deploy`. It needs
+two repository secrets: `CLOUDFLARE_API_TOKEN` (a token from the "Edit Cloudflare
+Workers" template) and `CLOUDFLARE_ACCOUNT_ID`. Without them the deploy step is
+skipped with a warning.
