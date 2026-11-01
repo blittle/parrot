@@ -70,6 +70,7 @@ export function OfflinePanel({ list }: { list: WordList }) {
       <div className="offline-row">
         <div>
           <strong>{done ? "Ready offline" : downloading ? "Downloading audio…" : "Audio for offline use"}</strong>
+          {done && <div className="small">All set for airplane mode.</div>}
           <div className="muted small">
             {status ? `${status.ready} of ${status.total} clips saved on this device` : error ? "" : "Checking…"}
           </div>

@@ -92,5 +92,31 @@ export function spokenTranslation(word: Word, languageCode: string): string {
 export function displayTerm(word: Word, languageCode: string): string {
   const article = normalizeArticle(word.article, languageCode);
   const term = word.term.trim();
-  return article && !startsWithArticle(term, article) ? `${article} ${term}` : term;
+  if (!article || startsWithArticle(term, article)) return term;
+  return article.endsWith("'") ? `${article}${term}` : `${article} ${term}`;
+}
+
+export type Gender = "m" | "f" | "n" | "pl";
+
+// Grammatical gender of each definite/indefinite article, for colour-coding.
+const ARTICLE_GENDER: Record<string, Record<string, Gender>> = {
+  de: { der: "m", die: "f", das: "n", ein: "m", eine: "f" },
+  fr: { le: "m", la: "f", les: "pl", un: "m", une: "f" },
+  es: { el: "m", la: "f", los: "m", las: "f", un: "m", una: "f" },
+  it: { il: "m", lo: "m", la: "f", i: "m", gli: "m", le: "f", un: "m", una: "f" },
+};
+
+/**
+ * Splits a word into its leading article (if any) and the rest, with the
+ * article's gender, e.g. "der Hund" -> { article: "der", rest: "Hund", gender: "m" }.
+ */
+export function splitArticle(word: Word, languageCode: string): { article?: string; rest: string; gender?: Gender } {
+  const full = displayTerm(word, languageCode);
+  const genders = ARTICLE_GENDER[baseLanguage(languageCode)] ?? {};
+  const elided = full.match(/^([lL]')(.+)$/);
+  if (elided) return { article: elided[1], rest: elided[2] };
+  const [first, ...others] = full.split(" ");
+  const gender = genders[first.toLowerCase()];
+  if (!gender || others.length === 0) return { rest: full };
+  return { article: first, rest: others.join(" "), gender };
 }

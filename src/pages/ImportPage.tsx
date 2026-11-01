@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { requestAutoDownload } from "../components/OfflinePanel";
+import { Term } from "../components/Term";
 import { listsDb } from "../lib/db";
 import { buildWords, guessMapping, looksLikeHeader, NO_COLUMN, parseDelimited, readFile, type ColumnMapping, type Rows } from "../lib/import";
 import { TARGET_LANGUAGES, TRANSLATION_LANGUAGES } from "../lib/languages";
 import { navigate } from "../lib/router";
-import { displayTerm, spokenTerm } from "../lib/text";
+import { spokenTerm } from "../lib/text";
 
 const FIELDS: { key: keyof ColumnMapping; label: string; required?: boolean }[] = [
   { key: "term", label: "Word", required: true },
@@ -186,7 +187,9 @@ export function ImportPage() {
               <tbody>
                 {words.slice(0, 10).map((w, i) => (
                   <tr key={i}>
-                    <td lang={languageCode}>{displayTerm(w, languageCode)}</td>
+                    <td>
+                      <Term word={w} languageCode={languageCode} />
+                    </td>
                     <td lang={languageCode} className="muted">
                       {spokenTerm(w, languageCode)}
                     </td>

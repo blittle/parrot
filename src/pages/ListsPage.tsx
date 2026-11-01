@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckIcon } from "../components/Icons";
+import { Parrot } from "../components/Parrot";
 import { listsDb } from "../lib/db";
 import { languageLabel } from "../lib/languages";
 import { offlineStatus, type OfflineStatus } from "../lib/offline";
@@ -37,7 +38,10 @@ export function ListsPage() {
       {error && <p className="error">Could not open local storage: {error}</p>}
       {lists?.length === 0 && (
         <div className="empty">
-          <p>No lists yet.</p>
+          <Parrot mood="sleepy" size={120} />
+          <p>
+            <strong>No lists yet.</strong> Feed me some words!
+          </p>
           <p className="muted">
             Import a spreadsheet (.xlsx or .csv) or paste words. A column of words and a column of translations is all you need; an article
             column (der/die/das) is optional.

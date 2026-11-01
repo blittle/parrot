@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { DownloadIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon } from "../components/Icons";
+import { Confetti } from "../components/Confetti";
+import { DownloadIcon, FlameIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, RepeatIcon } from "../components/Icons";
+import { Parrot } from "../components/Parrot";
+import { Term } from "../components/Term";
 import type { SavedSession } from "../lib/db";
+import { praise } from "../lib/languages";
+import { currentStreak, loadStreak, localDate, recordSession, saveStreak } from "../lib/streak";
 import { displayTerm } from "../lib/text";
 
 const RESUME_KEY = "parrot:resume";
@@ -27,6 +32,26 @@ function clock(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+const RECORDED_KEY = "parrot:recorded-session";
+
+/** Counts a finished session toward the streak, once per session. Returns the streak. */
+function recordFinished(session: SavedSession): number {
+  const today = localDate();
+  let data = loadStreak();
+  let already = false;
+  try {
+    already = localStorage.getItem(RECORDED_KEY) === String(session.createdAt);
+    localStorage.setItem(RECORDED_KEY, String(session.createdAt));
+  } catch {
+    // Worst case a replay counts twice toward total words.
+  }
+  if (!already) {
+    data = recordSession(data, today, session.segments.length);
+    saveStreak(data);
+  }
+  return currentStreak(data.days, today);
+}
+
 export function Player({ session, autoPlay }: { session: SavedSession; autoPlay: boolean }) {
   const audio = useRef<HTMLAudioElement>(null);
   const panel = useRef<HTMLElement>(null);
@@ -34,6 +59,7 @@ export function Player({ session, autoPlay }: { session: SavedSession; autoPlay:
   const [time, setTime] = useState(() => loadPosition(session.createdAt));
   const [playing, setPlaying] = useState(false);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [celebrate, setCelebrate] = useState<{ streak: number } | null>(null);
   const lastSaved = useRef(0);
 
   // Create and revoke the object URL in one effect so StrictMode's double run can't revoke a URL still in use.
@@ -75,6 +101,7 @@ export function Player({ session, autoPlay }: { session: SavedSession; autoPlay:
     const el = audio.current;
     if (!el) return;
     if (el.paused) {
+      setCelebrate(null);
       if (finished) seek(0);
       el.play().catch(() => setPlaying(false));
     } else el.pause();
@@ -124,17 +151,50 @@ export function Player({ session, autoPlay }: { session: SavedSession; autoPlay:
 
   return (
     <section className="player" ref={panel} aria-label="Player">
-      <div className="player-title muted small">{title}</div>
-      <div className="now" onClick={() => setShowTranslation(true)}>
-        <div className="muted small">
-          Word {index + 1} of {segments.length}
+      <div className="player-head">
+        <Parrot mood={celebrate ? "happy" : playing ? "talking" : "idle"} size={56} />
+        <div className="player-title">
+          <strong>{title}</strong>
+          <span className="muted small">
+            Word {index + 1} of {segments.length}
+          </span>
         </div>
-        <div className="term" lang={languageCode}>
-          {word ? displayTerm(word, languageCode) : ""}
-        </div>
-        <div className={showTranslation ? "translation" : "translation hidden"}>{word?.translation || " "}</div>
-        {word?.notes && <div className="muted small">{word.notes}</div>}
       </div>
+
+      {celebrate ? (
+        <div className="complete">
+          <Confetti />
+          <div className="complete-title" lang={languageCode}>
+            {praise(languageCode)}
+          </div>
+          <p className="muted">
+            {segments.length} words in {clock(session.duration)}
+          </p>
+          {celebrate.streak > 0 && (
+            <span className="streak big-streak">
+              <FlameIcon /> {celebrate.streak}-day streak
+            </span>
+          )}
+          <button
+            className="button primary"
+            onClick={() => {
+              setCelebrate(null);
+              seek(0);
+              void audio.current?.play();
+            }}
+          >
+            <RepeatIcon /> Once more
+          </button>
+        </div>
+      ) : (
+        <div className="now" onClick={() => setShowTranslation(true)}>
+          <div className="term" key={index}>
+            {word ? <Term word={word} languageCode={languageCode} /> : ""}
+          </div>
+          <div className={showTranslation ? "translation" : "translation hidden"}>{word?.translation || "\u00a0"}</div>
+          {word?.notes && <div className="muted small">{word.notes}</div>}
+        </div>
+      )}
 
       <input
         className="scrubber"
@@ -190,7 +250,11 @@ export function Player({ session, autoPlay }: { session: SavedSession; autoPlay:
             setPlaying(false);
             savePosition(session.createdAt, audio.current?.currentTime ?? 0);
           }}
-          onEnded={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false);
+            setCelebrate({ streak: recordFinished(session) });
+            navigator.vibrate?.([30, 60, 30]);
+          }}
           onTimeUpdate={(e) => {
             const t = e.currentTarget.currentTime;
             setTime(t);

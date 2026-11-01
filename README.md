@@ -19,6 +19,9 @@ See [PLAN.md](PLAN.md) for the design and roadmap.
 
 - **Import** `.xlsx`, `.csv` or `.tsv`, or paste from a spreadsheet. Columns are detected
   automatically (word, translation, article/gender, notes), including legacy Excel encodings.
+- **Playful by design:** Parrot the mascot talks along while audio plays and celebrates when
+  you finish; articles are colour-coded by gender (der, die, das); the app greets you in the
+  language you're learning and keeps a daily practice streak.
 - **Speech-ready text:** articles are added to nouns ("der Hund"), gender markers become
   articles (`m` → der), and notation like `(n.)`, `, -e` or `etw.` is cleaned up before speaking.
   Any word can have a custom "spoken as" override.

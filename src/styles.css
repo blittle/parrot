@@ -16,8 +16,17 @@
   --notice: #fff6dc;
   --nav-h: 60px;
   --tap: 44px;
+  /* Parrot plumage, for fun accents. */
+  --sun: #f2c230;
+  --flame: #f08a24;
+  /* Article genders: der/le/el blue, die/la red, das green. */
+  --g-m: #2f6fdb;
+  --g-f: #d6455d;
+  --g-n: #1f9a6a;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   color-scheme: light dark;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Rounded system font on Apple devices, regular elsewhere. */
+  font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -35,6 +44,9 @@
     --success: #4fb57a;
     --danger: #f97066;
     --notice: #3a3216;
+    --g-m: #6b9cff;
+    --g-f: #ff7a8c;
+    --g-n: #4cc995;
   }
 }
 
@@ -93,6 +105,7 @@ h2 { font-size: 1rem; margin: 20px 0 8px; }
   font-weight: 500;
 }
 .tabbar a.active { color: var(--accent); }
+.tabbar a.active svg { animation: pop 0.35s var(--spring); }
 
 .notice {
   display: block;
@@ -425,9 +438,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   border-radius: 20px;
   scroll-margin-top: 12px;
 }
-.player-title { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-head { display: flex; align-items: center; gap: 10px; }
+.player-title { display: grid; min-width: 0; }
+.player-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now { text-align: center; padding: 16px 0 12px; display: grid; gap: 6px; min-height: 180px; align-content: center; }
-.now .term { font-size: clamp(2rem, 9vw, 3rem); font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.now .term { font-size: clamp(2rem, 9vw, 3rem); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; animation: word-in 0.4s var(--spring); }
 .now .translation { font-size: 1.25rem; color: var(--muted); }
 .now .translation.hidden { filter: blur(9px); user-select: none; }
 .scrubber { width: 100%; }
@@ -470,4 +485,103 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   .grid-2.end { grid-template-columns: 1fr auto; }
   .button.block { width: auto; display: inline-flex; }
   .panel .button.block { width: 100%; display: flex; }
+}
+
+/* ---------- Fun ---------- */
+
+/* Springy press feedback on everything tappable. */
+.button, .chip, .round, .play, .known-toggle, .star, .icon {
+  transition: transform 0.12s var(--spring), background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.button:active:not(:disabled), .chip:active, .round:active:not(:disabled), .play:active:not(:disabled), .known-toggle:active, .star:active {
+  transform: scale(0.93);
+}
+.chip.active { animation: pop 0.3s var(--spring); }
+.known-toggle.on svg { animation: pop 0.35s var(--spring); }
+.button.primary { box-shadow: 0 3px 0 color-mix(in srgb, var(--accent) 60%, black); }
+.button.primary:active:not(:disabled) { box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 60%, black); transform: translateY(2px) scale(0.98); }
+.round.big { box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 60%, black); }
+.round.big:active { box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 60%, black); transform: translateY(3px); }
+
+/* Article colours. */
+.article { font-weight: 800; }
+.article.g-m { color: var(--g-m); }
+.article.g-f { color: var(--g-f); }
+.article.g-n { color: var(--g-n); }
+.legend { display: inline-flex; gap: 6px; margin-left: 4px; }
+.legend .article { font-size: 0.8rem; }
+
+/* Greeting and streak. */
+.hello { display: flex; align-items: center; gap: 12px; margin: 4px 0 4px; }
+.hello h1 { margin: 0 0 2px; font-size: 1.6rem; }
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--flame) 16%, transparent);
+  color: var(--flame);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.streak svg { animation: flicker 1.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.big-streak { font-size: 1.05rem; padding: 6px 14px 6px 10px; }
+
+/* Session complete. */
+.complete { display: grid; justify-items: center; gap: 10px; padding: 20px 0 12px; text-align: center; min-height: 180px; align-content: center; }
+.complete p { margin: 0; }
+.complete-title { font-size: clamp(1.8rem, 8vw, 2.4rem); font-weight: 800; color: var(--accent); animation: word-in 0.5s var(--spring); }
+
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 50; }
+.confetti span {
+  position: absolute;
+  top: -16px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.5, 1);
+  animation-fill-mode: forwards;
+}
+.confetti span.round-bit { width: 10px; height: 10px; border-radius: 50%; }
+
+/* The parrot. transform-box lets SVG parts rotate around their own centres. */
+.parrot { overflow: visible; flex: none; }
+.parrot * { transform-box: fill-box; }
+.parrot-body { transform-origin: 50% 100%; }
+.parrot-head { transform-origin: 30% 90%; }
+.parrot-jaw { transform-origin: 0% 0%; }
+.parrot-wing { transform-origin: 50% 10%; }
+.parrot-eye { transform-origin: 50% 50%; animation: blink 4.5s infinite; }
+.parrot-idle .parrot-body { animation: bob 3.2s ease-in-out infinite; }
+.parrot-idle .parrot-head { animation: tilt 6s ease-in-out infinite; }
+.parrot-talking .parrot-body { animation: bob 0.9s ease-in-out infinite; }
+.parrot-talking .parrot-jaw { animation: squawk 0.28s ease-in-out infinite alternate; }
+.parrot-talking .parrot-head { animation: nod 0.9s ease-in-out infinite; }
+.parrot-happy .parrot-body { animation: hop 0.55s var(--spring) infinite; }
+.parrot-happy .parrot-wing { animation: flap 0.28s ease-in-out infinite alternate; }
+.parrot-happy .parrot-jaw { animation: squawk 0.2s ease-in-out infinite alternate; }
+.parrot-sleepy .parrot-body { animation: bob 5s ease-in-out infinite; }
+.parrot-sleepy .parrot-eye { animation: none; transform: scaleY(0.15); }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes tilt { 0%, 70%, 100% { transform: rotate(0); } 78%, 88% { transform: rotate(-9deg); } }
+@keyframes nod { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(5deg); } }
+@keyframes squawk { from { transform: rotate(0); } to { transform: rotate(22deg); } }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-12px) rotate(-4deg); } }
+@keyframes flap { from { transform: rotate(0); } to { transform: rotate(-30deg); } }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+@keyframes pop { 0% { transform: scale(0.8); } 100% { transform: scale(1); } }
+@keyframes word-in { from { opacity: 0; transform: translateY(10px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes flicker { 0%, 100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.12) rotate(3deg); } }
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(var(--drift), 105vh) rotate(var(--spin)); opacity: 0; }
+}
+
+/* Calm everything down for people who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

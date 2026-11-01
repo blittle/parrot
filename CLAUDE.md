@@ -16,6 +16,10 @@ Both share the same cache key, so clips are interchangeable. Clips are cached in
 - Anything needed to practice must work offline: clips in IndexedDB, voices cached in localStorage, last session in IndexedDB. Never make playback depend on the network.
 - `useEffect` callbacks must not return values (use braces): newer Chrome returns a Promise from `scrollTo`, which crashed React.
 
+## Personality
+- The UI should feel playful: Parrot the mascot (`components/Parrot.tsx`), article colours by gender (`components/Term.tsx`), greetings and praise in the target language, streaks, confetti on finishing. Keep it light and never in the way of practicing.
+- All motion must stop under `prefers-reduced-motion` (handled globally in `styles.css`).
+
 ## Rules
 - Run `npm test` and `npm run typecheck` before committing.
 - Never commit secrets. The server key lives in `.dev.vars` locally and `wrangler secret` in production. Worker config that varies per deployment (Access domain, AUD, allowed emails) is also a secret, so CI deploys never overwrite it; keep `vars` out of `wrangler.jsonc`.

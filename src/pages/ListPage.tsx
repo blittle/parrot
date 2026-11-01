@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronIcon, CheckIcon, PlayIcon } from "../components/Icons";
 import { OfflinePanel } from "../components/OfflinePanel";
+import { GenderLegend, Term } from "../components/Term";
 import { listsDb } from "../lib/db";
 import { languageLabel } from "../lib/languages";
 import { href, navigate } from "../lib/router";
-import { displayTerm, spokenTerm } from "../lib/text";
+import { spokenTerm } from "../lib/text";
 import { getClip, resolveVoice } from "../lib/tts";
 import type { Word, WordList } from "../lib/types";
 
@@ -95,7 +96,8 @@ export function ListPage({ id }: { id: string }) {
         aria-label="List name"
       />
       <p className="muted small">
-        {languageLabel(list.languageCode)} → {languageLabel(list.translationLanguageCode)} · {list.words.length} words · {known} known
+        {languageLabel(list.languageCode)} → {languageLabel(list.translationLanguageCode)} · {list.words.length} words · {known} known{" "}
+        <GenderLegend languageCode={list.languageCode} />
       </p>
 
       <a className="button primary block" href={href("practice", list.id)}>
@@ -180,14 +182,15 @@ function WordCard({
           {playing ? "…" : <PlayIcon size={18} />}
         </button>
         <button className="word-main" onClick={onToggle} aria-expanded={open}>
-          <span className="word-term" lang={languageCode}>
-            {displayTerm(word, languageCode) || <span className="muted">New word</span>}
-          </span>
+          <span className="word-term">{word.term.trim() ? <Term word={word} languageCode={languageCode} /> : <span className="muted">New word</span>}</span>
           <span className="word-translation">{word.translation}</span>
         </button>
         <button
           className={word.known ? "known-toggle on" : "known-toggle"}
-          onClick={() => onChange({ known: !word.known })}
+          onClick={() => {
+            navigator.vibrate?.(12);
+            onChange({ known: !word.known });
+          }}
           aria-pressed={!!word.known}
           aria-label={word.known ? "Marked known" : "Mark as known"}
           title="Known words can be skipped in practice"

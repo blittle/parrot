@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { FlameIcon } from "../components/Icons";
+import { Parrot } from "../components/Parrot";
 import { VoiceSelect } from "../components/VoiceSelect";
 import { listsDb, sessionsDb, type SavedSession } from "../lib/db";
+import { greeting } from "../lib/languages";
 import { loadPractice, savePractice, type PracticeSettings } from "../lib/practice";
 import { estimateSeconds, renderSession, type RenderProgress } from "../lib/render";
 import { href, navigate } from "../lib/router";
 import { buildPlan, PRESETS, selectWords, type SessionOptions, type Step } from "../lib/sequence";
+import { currentStreak, loadStreak, localDate } from "../lib/streak";
 import { spokenTerm } from "../lib/text";
 import { resolveVoice } from "../lib/tts";
 import type { WordList } from "../lib/types";
@@ -25,6 +29,7 @@ export function PracticePage({ listId }: { listId?: string }) {
   const [progress, setProgress] = useState<RenderProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ data: SavedSession; fresh: boolean } | null>(null);
+  const streak = currentStreak(loadStreak().days, localDate());
 
   useEffect(() => {
     listsDb.all().then(setLists, (e: Error) => setError(e.message));
@@ -91,9 +96,10 @@ export function PracticePage({ listId }: { listId?: string }) {
   if (lists.length === 0) {
     return (
       <div className="empty">
-        <h1>Practice</h1>
-        <p>Import a word list to start practicing.</p>
-        <a className="button primary" href={href("import")}>
+        <Parrot mood="idle" size={140} />
+        <h1>Nothing to repeat yet</h1>
+        <p className="muted">Give me a word list and I'll start talking. A spreadsheet or a quick paste works.</p>
+        <a className="button primary large" href={href("import")}>
           Import a list
         </a>
       </div>
@@ -104,8 +110,24 @@ export function PracticePage({ listId }: { listId?: string }) {
     <>
       {session && <Player key={session.data.createdAt} session={session.data} autoPlay={session.fresh} />}
 
+      {!session && (
+        <div className="hello">
+          <Parrot mood="idle" size={72} />
+          <div>
+            <h1 lang={list?.languageCode}>{greeting(list?.languageCode ?? "de-DE", new Date().getHours())}</h1>
+            {streak > 0 ? (
+              <span className="streak">
+                <FlameIcon /> {streak}-day streak
+              </span>
+            ) : (
+              <span className="muted small">Finish a session to start a streak.</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <section className="panel">
-        <h1 className="panel-title">{session ? "New session" : "Practice"}</h1>
+        <h2 className="panel-title">{session ? "New session" : "Ready when you are"}</h2>
         <label className="field">
           <span>List</span>
           <select value={list?.id ?? ""} onChange={(e) => navigate("practice", e.target.value)}>
@@ -144,13 +166,13 @@ export function PracticePage({ listId }: { listId?: string }) {
               <>
                 <progress value={progress.done} max={progress.total || 1} />
                 <span className="muted small">
-                  Getting audio {progress.done}/{progress.total}
+                  Gathering words {progress.done}/{progress.total}
                 </span>
               </>
             ) : (
               <>
                 <progress />
-                <span className="muted small">Assembling session…</span>
+                <span className="muted small">Warming up the parrot…</span>
               </>
             )}
           </div>
