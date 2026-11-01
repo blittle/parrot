@@ -20,7 +20,7 @@ export interface RenderedSession {
 }
 
 export type RenderProgress =
-  | { phase: "audio"; done: number; total: number }
+  | { phase: "audio"; done: number; total: number; waiting?: boolean }
   | { phase: "render" };
 
 /**
@@ -31,7 +31,7 @@ export type RenderProgress =
 export async function renderSession(plan: Plan, onProgress: (p: RenderProgress) => void): Promise<RenderedSession> {
   const clipItems = plan.items.filter((i) => i.kind === "clip");
   const reqs = clipItems.map((i) => i.req);
-  const clips = await getClips(reqs, (done, total) => onProgress({ phase: "audio", done, total }));
+  const clips = await getClips(reqs, (done, total, waiting) => onProgress({ phase: "audio", done, total, waiting }));
   onProgress({ phase: "render" });
 
   // Decode each unique clip once.

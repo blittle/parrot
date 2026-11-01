@@ -89,6 +89,9 @@ export function OfflinePanel({ list }: { list: WordList }) {
       {(downloading || (status && !done && status.ready > 0)) && status && (
         <progress value={status.ready} max={status.total || 1} />
       )}
+      {downloading && status?.waiting && (
+        <p className="muted small">Google's per-minute limit reached. Continuing shortly…</p>
+      )}
       {!online && !done && <p className="muted small">Connect to the internet to download the rest.</p>}
       {error && <p className="error small">{error}</p>}
     </section>

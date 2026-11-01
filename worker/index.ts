@@ -87,6 +87,10 @@ export default {
       return error("Not found", 404);
     } catch (err) {
       if (err instanceof GoogleTtsError) {
+        // Pass quota errors through so the app knows to wait and retry.
+        if (err.status === 429) {
+          return json({ error: `Google TTS: ${err.message}` } satisfies ApiError, 429, { "Retry-After": "30" });
+        }
         // Surface Google's message (e.g. unknown voice) but don't echo upstream 401/403s,
         // which would look like the user's own auth failed.
         return error(`Google TTS: ${err.message}`, err.status >= 500 ? 502 : 400);

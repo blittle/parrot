@@ -2,6 +2,7 @@ import type { ApiError, TtsRequest, TtsResponse, Voice, VoicesResponse } from ".
 import { cacheKey } from "../../shared/cache-key";
 import { GoogleTtsError, listVoices as googleListVoices, synthesize as googleSynthesize } from "../../shared/google";
 import { clipsDb } from "./db";
+import { HttpError, isRateLimit, withRetry } from "./retry";
 import { getSettings } from "./settings";
 
 export type Mode = "own-key" | "server";
@@ -13,6 +14,9 @@ export function currentMode(): Mode {
 /** Rewrites raw errors into something actionable for the current mode. */
 function explain(err: unknown, mode: Mode): Error {
   const message = err instanceof Error ? err.message : String(err);
+  if (isRateLimit(err)) {
+    return new Error("Google's usage limit is still reached. Wait a minute and try again, or raise the Text-to-Speech quota in Google Cloud.");
+  }
   if (mode === "server" && /Cloudflare Access|Unauthorized|401/.test(message)) {
     return new Error("No API key set. Add your own Google API key in Settings, or sign in to the Parrot server.");
   }
@@ -33,7 +37,7 @@ function explain(err: unknown, mode: Mode): Error {
 async function serverCall<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   const body = (await res.json().catch(() => null)) as T | ApiError | null;
-  if (!res.ok) throw new Error((body as ApiError | null)?.error ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new HttpError((body as ApiError | null)?.error ?? `Request failed (${res.status})`, res.status);
   return body as T;
 }
 
@@ -108,7 +112,8 @@ export interface Clip {
 const inflight = new Map<string, Promise<Clip>>();
 
 /** Returns audio for a request: from IndexedDB if we have it, otherwise synthesized and stored. */
-export async function getClip(req: Required<TtsRequest>): Promise<Clip> {
+/** `onWait` is called when Google's quota is hit and the download pauses before retrying. */
+export async function getClip(req: Required<TtsRequest>, onWait?: (ms: number) => void): Promise<Clip> {
   const hash = await cacheKey(req);
   const existing = inflight.get(hash);
   if (existing) return existing;
@@ -120,19 +125,20 @@ export async function getClip(req: Required<TtsRequest>): Promise<Clip> {
     const mode = currentMode();
     let blob: Blob;
     try {
-      if (mode === "own-key") {
-        const bytes = await googleSynthesize(req, getSettings().apiKey);
-        blob = new Blob([bytes as BlobPart], { type: "audio/mpeg" });
-      } else {
+      blob = await withRetry(async () => {
+        if (mode === "own-key") {
+          const bytes = await googleSynthesize(req, getSettings().apiKey);
+          return new Blob([bytes as BlobPart], { type: "audio/mpeg" });
+        }
         const res = await serverCall<TtsResponse>("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(req),
         });
         const audio = await fetch(res.url);
-        if (!audio.ok) throw new Error(`Could not download audio (${audio.status})`);
-        blob = await audio.blob();
-      }
+        if (!audio.ok) throw new HttpError(`Could not download audio (${audio.status})`, audio.status);
+        return audio.blob();
+      }, { onWait });
     } catch (err) {
       if (!navigator.onLine || err instanceof TypeError) {
         throw new Error("Some audio isn't downloaded yet, and you're offline. Connect once to download it.");
@@ -150,8 +156,8 @@ export async function getClip(req: Required<TtsRequest>): Promise<Clip> {
 /** Fetches many clips with limited concurrency. Stops at the first error. */
 export async function getClips(
   reqs: Required<TtsRequest>[],
-  onProgress: (done: number, total: number) => void,
-  concurrency = 4,
+  onProgress: (done: number, total: number, waiting?: boolean) => void,
+  concurrency = 3,
 ): Promise<Clip[]> {
   const results: Clip[] = new Array(reqs.length);
   let next = 0;
@@ -163,7 +169,7 @@ export async function getClips(
     while (next < reqs.length && failed === undefined) {
       const i = next++;
       try {
-        results[i] = await getClip(reqs[i]);
+        results[i] = await getClip(reqs[i], () => onProgress(done, reqs.length, true));
       } catch (err) {
         failed ??= err;
         return;

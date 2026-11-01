@@ -166,7 +166,9 @@ export function PracticePage({ listId }: { listId?: string }) {
               <>
                 <progress value={progress.done} max={progress.total || 1} />
                 <span className="muted small">
-                  Gathering words {progress.done}/{progress.total}
+                  {progress.waiting
+                    ? `Google's per-minute limit reached. Continuing shortly… (${progress.done}/${progress.total})`
+                    : `Gathering words ${progress.done}/${progress.total}`}
                 </span>
               </>
             ) : (

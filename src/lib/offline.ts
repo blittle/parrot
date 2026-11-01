@@ -50,6 +50,8 @@ async function requestsFor(list: WordList): Promise<Required<TtsRequest>[]> {
 export interface OfflineStatus {
   ready: number;
   total: number;
+  /** True while paused for Google's per-minute quota. */
+  waiting?: boolean;
 }
 
 export async function offlineStatus(list: WordList): Promise<OfflineStatus> {
@@ -65,5 +67,5 @@ export async function downloadForOffline(list: WordList, onProgress: (status: Of
   const missing = reqs.filter((_, i) => !present[i]);
   const already = reqs.length - missing.length;
   onProgress({ ready: already, total: reqs.length });
-  await getClips(missing, (done) => onProgress({ ready: already + done, total: reqs.length }));
+  await getClips(missing, (done, _total, waiting) => onProgress({ ready: already + done, total: reqs.length, waiting }));
 }
