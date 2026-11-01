@@ -91,8 +91,9 @@ npx wrangler secret put ACCESS_AUD           # the Access application's Audience
 ```
 
 Then put the site behind **Cloudflare Access**: in the `parrot` Worker's
-**Settings → Domains & Routes**, enable Access on the `workers.dev` route, and give
-the Access application an Allow policy for the same emails as `ALLOWED_EMAILS`.
+**Domains** tab, turn on Cloudflare Access for the `workers.dev` URL, copy the team
+domain and AUD tag it shows into the secrets above, and limit the Access policy to the
+same emails as `ALLOWED_EMAILS`. Details in [DEPLOY.md](DEPLOY.md), step 4.
 Until all four secrets are set, `/api/*` rejects every request with 401.
 
 ### Continuous deployment

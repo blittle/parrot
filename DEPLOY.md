@@ -105,26 +105,39 @@ The other two secrets, `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD`, come from step 4.
 
 ## Step 4: Cloudflare Access login
 
-Access puts a login page in front of the whole site, free for up to 50 users. Cloudflare's
-menus move around; if a label differs, the step is the same.
+Access puts a login page in front of the whole site, free for up to 50 users. You turn it
+on from the Worker itself; Cloudflare creates the Access application and policy for you.
+(Menus as of late 2026; Cloudflare renames things often, so if a label differs, look for
+the closest match.)
 
-- [ ] **Zero Trust** (dashboard sidebar): on a first visit, pick a **team name** and the
-  **Free** plan. Your team domain is `<team-name>.cloudflareaccess.com`.
-- [ ] **Workers & Pages → parrot → Settings → Domains & Routes**: on the `workers.dev` row,
-  turn on **Cloudflare Access**. This creates an Access application for the Worker.
-- [ ] Open that application (**Manage Cloudflare Access**, or
-  **Zero Trust → Access → Applications**) and set its policy:
-  - Action **Allow**, rule **Include → Emails** → the same addresses as `ALLOWED_EMAILS`.
-  - Remove any broader rule (for example "everyone" or an email domain).
+- [ ] **Zero Trust** (dashboard sidebar) → **Overview**: if it's your first visit, finish
+  the short onboarding (pick a **team name** and the **Free** plan); Access can't be turned
+  on for a Worker until this is done. Already set up? The **Account details** card shows
+  your **Team name** and plan. Your team domain is `<team-name>.cloudflareaccess.com`.
+- [ ] **Workers & Pages → parrot → Domains** tab → **Worker URL** section: turn on
+  **Cloudflare Access** for the `workers.dev` URL. (Older dashboards:
+  **Settings → Domains & Routes → Enable Cloudflare Access**.)
+- [ ] The confirmation that appears shows two values. Copy both:
+  - the **team domain**, like `<team-name>.cloudflareaccess.com`
+  - the **AUD** (application audience) tag, a long hex string
+
+  Cloudflare's sample code labels them `TEAM_DOMAIN` and `POLICY_AUD`.
+- [ ] Choose **Manage Cloudflare Access** and check who the policy allows. It should be an
+  **Allow** policy whose rule includes only your email(s): **Include → Emails**, the same
+  addresses as `ALLOWED_EMAILS`. Remove anything broader, like "Everyone" or a whole
+  email domain.
 - [ ] Login method: the default **One-time PIN** emails you a code and needs no setup.
-  Google login is optional and needs an OAuth client in Google Cloud.
-- [ ] Copy the application's **Application Audience (AUD) Tag** from its overview page,
-  then set the last two secrets:
+- [ ] Set the last two secrets:
 
   ```sh
-  npx wrangler secret put ACCESS_TEAM_DOMAIN   # <team-name>.cloudflareaccess.com
+  npx wrangler secret put ACCESS_TEAM_DOMAIN   # <team-name>.cloudflareaccess.com (no https://)
   npx wrangler secret put ACCESS_AUD           # the AUD tag
   ```
+
+Lost the values? In **Zero Trust → Access controls → Applications**, open the parrot
+application → **Configure → Additional settings → Application Audience (AUD) Tag**. The
+team domain is the **Team name** from **Zero Trust → Overview → Account details**, followed
+by `.cloudflareaccess.com`.
 
 The emails in the Access policy and in `ALLOWED_EMAILS` must match. Someone only in the
 policy can open the site but gets "This account is not allowed" on every audio request.
@@ -185,13 +198,13 @@ On your phone, where Parrot is meant to be used:
 | Yellow "add your API key" banner after logging in | A Worker secret is missing, so `/api/*` answers 401 | `npx wrangler secret list` should show all four secrets; add the missing one |
 | "No allowed emails are configured" | `ALLOWED_EMAILS` not set | `npx wrangler secret put ALLOWED_EMAILS` |
 | "This account is not allowed" | Signed in with an email missing from `ALLOWED_EMAILS` | Add it there and in the Access policy |
-| "Invalid Cloudflare Access token" | `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match the Access application | Re-copy the AUD tag; the domain is only `<team>.cloudflareaccess.com` |
+| "Invalid Cloudflare Access token" | `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match the Access application | Re-copy the AUD tag (Step 4, "Lost the values?"); the domain is only `<team>.cloudflareaccess.com` |
 | "The Cloud Text-to-Speech API isn't enabled" | API not enabled in the key's Google project | Google Cloud → APIs & Services → Library → enable it |
 | Deploy fails with "bucket not found" | R2 bucket missing | `npx wrangler r2 bucket create parrot-audio` |
 | Actions deploy step says "Skipping deploy" | GitHub secrets missing | Step 5 |
 | Actions deploy fails with "Authentication error" | Token expired, revoked or missing Workers permission | New token from the Edit Cloudflare Workers template; update `CLOUDFLARE_API_TOKEN` |
-| Site opens without a login page | Access not enabled on the `workers.dev` route | Step 4, second checkbox |
-| No install option, or a blank home screen icon | The browser fetched the manifest or icons without the Access cookie | Add a second Access application for `/manifest.webmanifest` and `/icons/*` on the same hostname with a **Bypass, Everyone** policy |
+| Site opens without a login page | Access not enabled on the `workers.dev` URL | Step 4, second checkbox (Worker → **Domains** tab) |
+| No install option, or a blank home screen icon | The browser fetched the manifest or icons without the Access cookie | In **Zero Trust → Access controls → Applications**, add a self-hosted application for `/manifest.webmanifest` and `/icons/*` on the same hostname with a **Bypass, Everyone** policy |
 | Installed app shows the login page after weeks offline | The Access session expired | Open it online and sign in again; downloaded lists keep working offline either way |
 
 For anything else, the Worker's live logs: `npx wrangler tail`, or
