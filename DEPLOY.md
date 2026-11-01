@@ -126,7 +126,14 @@ the closest match.)
   **Allow** policy whose rule includes only your email(s): **Include → Emails**, the same
   addresses as `ALLOWED_EMAILS`. Remove anything broader, like "Everyone" or a whole
   email domain.
-- [ ] Login method: the default **One-time PIN** emails you a code and needs no setup.
+- [ ] Login methods: new Zero Trust accounts only offer **sign in with Cloudflare**, limited to
+  members of your Cloudflare account. Anyone else sees "Cloudflare sign-in is restricted to
+  members of the account". To let other people in by email:
+  - **Zero Trust → Integrations → Identity providers** (older dashboards:
+    **Settings → Authentication**) → **Add new → One-time PIN** → save.
+  - In the parrot application → **Configure → Login methods**, tick **One-time PIN** and save.
+
+  They'll get a code by email. Codes are only sent to addresses your policy allows.
 - [ ] Set the last two secrets:
 
   ```sh
@@ -138,6 +145,10 @@ Lost the values? In **Zero Trust → Access controls → Applications**, open th
 application → **Configure → Additional settings → Application Audience (AUD) Tag**. The
 team domain is the **Team name** from **Zero Trust → Overview → Account details**, followed
 by `.cloudflareaccess.com`.
+
+To add a person later: add their email to the policy's **Include → Emails** rule, and run
+`npx wrangler secret put ALLOWED_EMAILS` with the **full** comma-separated list (it replaces
+the old value).
 
 The emails in the Access policy and in `ALLOWED_EMAILS` must match. Someone only in the
 policy can open the site but gets "This account is not allowed" on every audio request.
@@ -197,6 +208,7 @@ On your phone, where Parrot is meant to be used:
 | --- | --- | --- |
 | Yellow "add your API key" banner after logging in | A Worker secret is missing, so `/api/*` answers 401 | `npx wrangler secret list` should show all four secrets; add the missing one |
 | "No allowed emails are configured" | `ALLOWED_EMAILS` not set | `npx wrangler secret put ALLOWED_EMAILS` |
+| "Cloudflare sign-in is restricted to members of the account" | The app only offers Cloudflare-account login | Add **One-time PIN** as a login method (step 4) |
 | "This account is not allowed" | Signed in with an email missing from `ALLOWED_EMAILS` | Add it there and in the Access policy |
 | "Invalid Cloudflare Access token" | `ACCESS_AUD` or `ACCESS_TEAM_DOMAIN` doesn't match the Access application | Re-copy the AUD tag (Step 4, "Lost the values?"); the domain is only `<team>.cloudflareaccess.com` |
 | "The Cloud Text-to-Speech API isn't enabled" | API not enabled in the key's Google project | Google Cloud → APIs & Services → Library → enable it |
