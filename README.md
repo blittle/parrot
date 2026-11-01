@@ -5,9 +5,17 @@ Learn vocabulary by ear. Import a word list, choose a repetition sequence
 session you can play with your phone locked or download. Uses Google Cloud
 text to speech. German first; French, Spanish and Italian work too.
 
+Parrot is built for phones first and is an installable **PWA**: add it to your
+home screen and every downloaded list plays fully offline.
+
 See [PLAN.md](PLAN.md) for the design and roadmap.
 
 ## Features
+
+- **Mobile first, works offline:** installable from the browser (Settings shows how on
+  iPhone and Android). A service worker caches the app; every imported list downloads all
+  its audio automatically, with an "Ready offline" indicator per list. The last session is
+  saved and resumes where you stopped, even with no connection.
 
 - **Import** `.xlsx`, `.csv` or `.tsv`, or paste from a spreadsheet. Columns are detected
   automatically (word, translation, article/gender, notes), including legacy Excel encodings.

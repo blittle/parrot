@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { requestAutoDownload } from "../components/OfflinePanel";
 import { listsDb } from "../lib/db";
 import { buildWords, guessMapping, looksLikeHeader, NO_COLUMN, parseDelimited, readFile, type ColumnMapping, type Rows } from "../lib/import";
 import { TARGET_LANGUAGES, TRANSLATION_LANGUAGES } from "../lib/languages";
@@ -81,6 +82,7 @@ export function ImportPage() {
         createdAt: now,
         updatedAt: now,
       });
+      requestAutoDownload(id);
       navigate("lists", id);
     } catch (e) {
       setError((e as Error).message);
@@ -91,7 +93,7 @@ export function ImportPage() {
   const width = rows?.[0]?.length ?? 0;
   const columnLabel = (i: number) => {
     const header = hasHeader ? rows?.[0][i] : "";
-    return header ? `Column ${i + 1}: ${header}` : `Column ${i + 1}`;
+    return header || `Column ${i + 1}`;
   };
 
   return (
@@ -122,9 +124,10 @@ export function ImportPage() {
           </label>
         </div>
 
-        <label className="field">
-          <span>Spreadsheet file (.xlsx, .csv, .tsv)</span>
+        <label className="file-drop">
           <input type="file" accept=".xlsx,.csv,.tsv,.txt,text/csv,text/tab-separated-values" onChange={(e) => void onFile(e.target.files?.[0])} />
+          <strong>Choose a spreadsheet</strong>
+          <span className="muted small">.xlsx, .csv or .tsv from Files, Drive or iCloud</span>
         </label>
 
         <details>
@@ -202,7 +205,7 @@ export function ImportPage() {
               <input value={name} onChange={(e) => setName(e.target.value)} />
             </label>
             <button className="button primary" onClick={() => void save()} disabled={saving || words.length === 0}>
-              Save {words.length} words
+              Save {words.length} words and download audio
             </button>
           </div>
         </section>

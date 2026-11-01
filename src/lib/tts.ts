@@ -39,6 +39,23 @@ async function serverCall<T>(path: string, init?: RequestInit): Promise<T> {
 
 const voiceCache = new Map<string, Promise<Voice[]>>();
 
+function storedVoices(languageCode: string): Voice[] | null {
+  try {
+    return JSON.parse(localStorage.getItem(`parrot:voices:${languageCode}`) ?? "null") as Voice[] | null;
+  } catch {
+    return null;
+  }
+}
+
+function storeVoices(languageCode: string, voices: Voice[]): void {
+  try {
+    localStorage.setItem(`parrot:voices:${languageCode}`, JSON.stringify(voices));
+  } catch {
+    // Not critical: only needed offline.
+  }
+}
+
+/** Google's voices for a language. Falls back to the last list seen, so it works offline. */
 export function listVoices(languageCode: string): Promise<Voice[]> {
   const mode = currentMode();
   const key = `${mode}:${getSettings().apiKey.slice(-6)}:${languageCode}`;
@@ -48,10 +65,18 @@ export function listVoices(languageCode: string): Promise<Voice[]> {
       mode === "own-key"
         ? googleListVoices(languageCode, getSettings().apiKey)
         : serverCall<VoicesResponse>(`/api/voices?lang=${encodeURIComponent(languageCode)}`).then((r) => r.voices)
-    ).catch((err: unknown) => {
-      voiceCache.delete(key);
-      throw explain(err, mode);
-    });
+    ).then(
+      (list) => {
+        storeVoices(languageCode, list);
+        return list;
+      },
+      (err: unknown) => {
+        voiceCache.delete(key);
+        const stored = storedVoices(languageCode);
+        if (stored) return stored;
+        throw explain(err, mode);
+      },
+    );
     voiceCache.set(key, voices);
   }
   return voices;
@@ -109,6 +134,9 @@ export async function getClip(req: Required<TtsRequest>): Promise<Clip> {
         blob = await audio.blob();
       }
     } catch (err) {
+      if (!navigator.onLine || err instanceof TypeError) {
+        throw new Error("Some audio isn't downloaded yet, and you're offline. Connect once to download it.");
+      }
       throw explain(err, mode);
     }
     await clipsDb.put(hash, blob);

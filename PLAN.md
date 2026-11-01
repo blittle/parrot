@@ -17,6 +17,13 @@ German first, French and Spanish possibly later.
 | Frontend | Vite + React + TypeScript | |
 | Google auth | API key restricted to the Text-to-Speech API | Simplest option in a Worker; a service account JWT is possible later if needed |
 
+## Principles
+
+- **Mobile first.** Designed for a phone in one hand: bottom tab bar, 44 px touch targets,
+  16 px inputs (no iOS zoom), safe-area insets, big player controls. Desktop is the adaptation.
+- **Offline first.** Installable PWA. Everything needed to practice a list (app shell, voices,
+  every clip at every speed the sequences use) is stored on the device.
+
 ## Architecture
 
 ```
@@ -59,6 +66,12 @@ Worker
   so playback survives a locked phone screen (iOS throttles background timers).
 - Media Session API for lock screen controls and track info.
 - Download a session as WAV. MP3 would be about 10x smaller but needs an encoder (e.g. lamejs).
+
+### 3b. Mobile and offline (done)
+- PWA: manifest, icons, service worker precaching the app shell (generated at build time).
+- Lists download all their clips after import; per-list offline status and a Download button.
+- Last session saved in IndexedDB and resumed at the saved position.
+- Voice lists cached so voices resolve offline.
 
 ### 4. Later
 - Export a list back to CSV.

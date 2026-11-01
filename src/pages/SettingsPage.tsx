@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { clipsDb } from "../lib/db";
+import { isIos, isStandalone, useInstallPrompt } from "../lib/pwa";
 import { updateSettings, useSettings } from "../lib/settings";
 import { listVoices } from "../lib/tts";
 
@@ -10,10 +11,14 @@ export function SettingsPage({ serverOk }: { serverOk: boolean | null }) {
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
   const [clipCount, setClipCount] = useState<number | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
+  const [usageMb, setUsageMb] = useState<number | null>(null);
+  const install = useInstallPrompt();
+  const standalone = isStandalone();
 
   useEffect(() => {
     clipsDb.count().then(setClipCount, () => setClipCount(null));
     navigator.storage?.persisted?.().then(setPersisted, () => setPersisted(null));
+    navigator.storage?.estimate?.().then((e) => setUsageMb(e.usage ? e.usage / 1024 / 1024 : 0), () => setUsageMb(null));
   }, []);
 
   async function save() {
@@ -47,6 +52,38 @@ export function SettingsPage({ serverOk }: { serverOk: boolean | null }) {
       <h1>Settings</h1>
 
       <section className="panel">
+        <h2>Install the app</h2>
+        {standalone ? (
+          <p>Parrot is installed. It opens from your home screen and works offline.</p>
+        ) : install ? (
+          <>
+            <p>Install Parrot to open it from your home screen, full screen and offline.</p>
+            <button className="button primary" onClick={() => void install()}>
+              Install Parrot
+            </button>
+          </>
+        ) : isIos() ? (
+          <ol className="help">
+            <li>
+              Tap the <strong>Share</strong> button in Safari's toolbar.
+            </li>
+            <li>
+              Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
+            </li>
+            <li>Open Parrot from the new home screen icon. It works offline from then on.</li>
+            <li>
+              Import your lists <strong>in the installed app</strong>. On iPhone, the home screen app keeps its own storage, so lists saved in
+              Safari don't carry over.
+            </li>
+          </ol>
+        ) : (
+          <p>
+            In your browser's menu, choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>Text to speech</h2>
         <p>
           Audio source: <strong>{mode}</strong>
@@ -57,6 +94,7 @@ export function SettingsPage({ serverOk }: { serverOk: boolean | null }) {
           <div className="input-row">
             <input
               type={reveal ? "text" : "password"}
+              autoCapitalize="off"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="AIza…"
@@ -120,7 +158,8 @@ export function SettingsPage({ serverOk }: { serverOk: boolean | null }) {
       <section className="panel">
         <h2>Saved audio</h2>
         <p>
-          {clipCount === null ? "Unknown" : `${clipCount} clips`} saved on this device.
+          {clipCount === null ? "Unknown" : `${clipCount} clips`} saved on this device
+          {usageMb !== null ? ` (${usageMb < 1 ? "<1" : Math.round(usageMb)} MB used)` : ""}.
           {persisted === false && <span className="muted"> The browser may clear them if storage runs low or the site isn't used for a while.</span>}
         </p>
         <button className="button" onClick={() => void clearCache()} disabled={!clipCount}>

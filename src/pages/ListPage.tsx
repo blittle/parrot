@@ -1,14 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronIcon, CheckIcon, PlayIcon } from "../components/Icons";
+import { OfflinePanel } from "../components/OfflinePanel";
 import { listsDb } from "../lib/db";
 import { languageLabel } from "../lib/languages";
 import { href, navigate } from "../lib/router";
-import { spokenTerm } from "../lib/text";
+import { displayTerm, spokenTerm } from "../lib/text";
 import { getClip, resolveVoice } from "../lib/tts";
 import type { Word, WordList } from "../lib/types";
 
 export function ListPage({ id }: { id: string }) {
   const [list, setList] = useState<WordList | null | undefined>(undefined);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
 
@@ -16,43 +20,52 @@ export function ListPage({ id }: { id: string }) {
     listsDb.get(id).then((l) => setList(l ?? null), (e: Error) => setError(e.message));
   }, [id]);
 
+  const visible = useMemo(() => {
+    if (!list) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return list.words;
+    return list.words.filter((w) => [w.term, w.translation, w.article, w.notes].some((f) => f?.toLowerCase().includes(q)));
+  }, [list, query]);
+
   if (list === undefined) return <p className="muted">Loading…</p>;
-  if (list === null) return <p>List not found. <a href={href("lists")}>Back to lists</a></p>;
+  if (list === null) {
+    return (
+      <p>
+        List not found. <a href={href("lists")}>Back to lists</a>
+      </p>
+    );
+  }
 
   async function save(next: WordList) {
     setList(next);
     await listsDb.put(next);
   }
 
-  function updateWord(wordId: string, patch: Partial<Word>) {
-    if (!list) return;
+  const updateWord = (wordId: string, patch: Partial<Word>) =>
     void save({ ...list, words: list.words.map((w) => (w.id === wordId ? { ...w, ...patch } : w)) });
-  }
 
-  function removeWord(wordId: string) {
-    if (!list) return;
-    void save({ ...list, words: list.words.filter((w) => w.id !== wordId) });
-  }
+  const removeWord = (wordId: string) => void save({ ...list, words: list.words.filter((w) => w.id !== wordId) });
 
   function addWord() {
-    if (!list) return;
-    void save({ ...list, words: [...list.words, { id: crypto.randomUUID(), term: "", translation: "" }] });
+    const word = { id: crypto.randomUUID(), term: "", translation: "" };
+    setQuery("");
+    setOpen(word.id);
+    void save({ ...list!, words: [...list!.words, word] });
   }
 
   async function deleteList() {
-    if (!list || !confirm(`Delete "${list.name}"? This can't be undone.`)) return;
-    await listsDb.delete(list.id);
+    if (!confirm(`Delete "${list!.name}"? This can't be undone.`)) return;
+    await listsDb.delete(list!.id);
     navigate("lists");
   }
 
   async function play(word: Word) {
-    if (!list) return;
     setError(null);
     audio.current?.pause();
     setPlaying(word.id);
     try {
-      const voice = await resolveVoice(list.languageCode);
-      const clip = await getClip({ text: spokenTerm(word, list.languageCode), languageCode: list.languageCode, voice, speakingRate: 1 });
+      const voice = await resolveVoice(list!.languageCode);
+      const clip = await getClip({ text: spokenTerm(word, list!.languageCode), languageCode: list!.languageCode, voice, speakingRate: 1 });
       const url = URL.createObjectURL(clip.blob);
       const el = new Audio(url);
       audio.current = el;
@@ -71,57 +84,50 @@ export function ListPage({ id }: { id: string }) {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <input
-            className="title-input"
-            value={list.name}
-            onChange={(e) => setList({ ...list, name: e.target.value })}
-            onBlur={() => void save(list)}
-            aria-label="List name"
-          />
-          <p className="muted small">
-            {languageLabel(list.languageCode)} → {languageLabel(list.translationLanguageCode)} · {list.words.length} words · {known} known
-          </p>
-        </div>
-        <a className="button primary" href={href("practice", list.id)}>
-          Practice
-        </a>
-      </div>
+      <a className="back" href={href("lists")}>
+        ‹ Lists
+      </a>
+      <input
+        className="title-input"
+        value={list.name}
+        onChange={(e) => setList({ ...list, name: e.target.value })}
+        onBlur={() => void save(list)}
+        aria-label="List name"
+      />
+      <p className="muted small">
+        {languageLabel(list.languageCode)} → {languageLabel(list.translationLanguageCode)} · {list.words.length} words · {known} known
+      </p>
+
+      <a className="button primary block" href={href("practice", list.id)}>
+        Practice this list
+      </a>
+
+      <OfflinePanel list={list} />
 
       {error && <p className="error">{error}</p>}
 
-      <div className="table-wrap">
-        <table className="words">
-          <thead>
-            <tr>
-              <th aria-label="Play" />
-              <th>Article</th>
-              <th>Word</th>
-              <th>Translation</th>
-              <th>Spoken as</th>
-              <th>Notes</th>
-              <th title="Known words can be skipped in practice">Known</th>
-              <th aria-label="Delete" />
-            </tr>
-          </thead>
-          <tbody>
-            {list.words.map((w) => (
-              <WordRow
-                key={w.id}
-                word={w}
-                languageCode={list.languageCode}
-                playing={playing === w.id}
-                onPlay={() => void play(w)}
-                onChange={(patch) => updateWord(w.id, patch)}
-                onRemove={() => removeWord(w.id)}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {list.words.length > 8 && (
+        <input className="search" type="search" placeholder="Search words" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search words" />
+      )}
 
-      <div className="row-actions">
+      <ul className="word-cards">
+        {visible.map((w) => (
+          <WordCard
+            key={w.id}
+            word={w}
+            languageCode={list.languageCode}
+            playing={playing === w.id}
+            open={open === w.id}
+            onToggle={() => setOpen(open === w.id ? null : w.id)}
+            onPlay={() => void play(w)}
+            onChange={(patch) => updateWord(w.id, patch)}
+            onRemove={() => removeWord(w.id)}
+          />
+        ))}
+      </ul>
+      {visible.length === 0 && query && <p className="muted center">No words match "{query}".</p>}
+
+      <div className="row-actions spread">
         <button className="button" onClick={addWord}>
           Add word
         </button>
@@ -133,10 +139,12 @@ export function ListPage({ id }: { id: string }) {
   );
 }
 
-function WordRow({
+function WordCard({
   word,
   languageCode,
   playing,
+  open,
+  onToggle,
   onPlay,
   onChange,
   onRemove,
@@ -144,46 +152,66 @@ function WordRow({
   word: Word;
   languageCode: string;
   playing: boolean;
+  open: boolean;
+  onToggle: () => void;
   onPlay: () => void;
   onChange: (patch: Partial<Word>) => void;
   onRemove: () => void;
 }) {
   // Edit locally, save on blur, so typing doesn't write to IndexedDB on every keystroke.
   const [draft, setDraft] = useState(word);
-  useEffect(() => setDraft(word), [word]);
+  useEffect(() => {
+    setDraft(word);
+  }, [word]);
   const commit = () => {
     if (JSON.stringify(draft) !== JSON.stringify(word)) onChange(draft);
   };
-  const field = (key: "article" | "term" | "translation" | "spoken" | "notes", props: { placeholder?: string; lang?: string } = {}) => (
-    <input
-      value={draft[key] ?? ""}
-      onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-      onBlur={commit}
-      aria-label={key}
-      {...props}
-    />
+  const field = (key: "article" | "term" | "translation" | "spoken" | "notes", label: string, extra: { placeholder?: string; lang?: string } = {}) => (
+    <label className="field">
+      <span>{label}</span>
+      <input value={draft[key] ?? ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} onBlur={commit} autoCapitalize="off" {...extra} />
+    </label>
   );
 
   return (
-    <tr className={word.known ? "known" : ""}>
-      <td>
-        <button className="play small" onClick={onPlay} disabled={!word.term.trim()} aria-label={`Play ${word.term}`}>
-          {playing ? "…" : "▶"}
+    <li className={`word-card${word.known ? " known" : ""}${open ? " open" : ""}`}>
+      <div className="word-row">
+        <button className="play" onClick={onPlay} disabled={!word.term.trim()} aria-label={`Play ${word.term}`}>
+          {playing ? "…" : <PlayIcon size={18} />}
         </button>
-      </td>
-      <td className="narrow">{field("article", { lang: languageCode })}</td>
-      <td>{field("term", { lang: languageCode })}</td>
-      <td>{field("translation")}</td>
-      <td>{field("spoken", { placeholder: spokenTerm({ ...draft, spoken: undefined }, languageCode), lang: languageCode })}</td>
-      <td>{field("notes")}</td>
-      <td className="center">
-        <input type="checkbox" checked={!!word.known} onChange={(e) => onChange({ known: e.target.checked })} aria-label="Known" />
-      </td>
-      <td>
-        <button className="icon" onClick={onRemove} aria-label={`Delete ${word.term}`}>
-          ×
+        <button className="word-main" onClick={onToggle} aria-expanded={open}>
+          <span className="word-term" lang={languageCode}>
+            {displayTerm(word, languageCode) || <span className="muted">New word</span>}
+          </span>
+          <span className="word-translation">{word.translation}</span>
         </button>
-      </td>
-    </tr>
+        <button
+          className={word.known ? "known-toggle on" : "known-toggle"}
+          onClick={() => onChange({ known: !word.known })}
+          aria-pressed={!!word.known}
+          aria-label={word.known ? "Marked known" : "Mark as known"}
+          title="Known words can be skipped in practice"
+        >
+          <CheckIcon />
+        </button>
+        <button className="icon chevron" onClick={onToggle} aria-label={open ? "Close" : "Edit"}>
+          <ChevronIcon />
+        </button>
+      </div>
+      {open && (
+        <div className="word-edit">
+          <div className="grid-article">
+            {field("article", "Article", { lang: languageCode })}
+            {field("term", "Word", { lang: languageCode })}
+          </div>
+          {field("translation", "Translation")}
+          {field("spoken", "Spoken as", { placeholder: spokenTerm({ ...draft, spoken: undefined }, languageCode), lang: languageCode })}
+          {field("notes", "Notes")}
+          <button className="button danger" onClick={onRemove}>
+            Delete word
+          </button>
+        </div>
+      )}
+    </li>
   );
 }

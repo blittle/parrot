@@ -1,9 +1,11 @@
-import type { WordList } from "./types";
+import type { Segment } from "./render";
+import type { Word, WordList } from "./types";
 
-// Minimal IndexedDB wrapper. Two stores: word lists, and synthesized audio clips keyed by hash.
+// Minimal IndexedDB wrapper. Stores: word lists, synthesized audio clips keyed
+// by hash, and the last rendered session (so it can be resumed offline).
 
 const DB_NAME = "parrot";
-const VERSION = 1;
+const VERSION = 2;
 
 interface ClipRecord {
   hash: string;
@@ -20,6 +22,7 @@ function open(): Promise<IDBDatabase> {
       const db = req.result;
       if (!db.objectStoreNames.contains("lists")) db.createObjectStore("lists", { keyPath: "id" });
       if (!db.objectStoreNames.contains("clips")) db.createObjectStore("clips", { keyPath: "hash" });
+      if (!db.objectStoreNames.contains("sessions")) db.createObjectStore("sessions", { keyPath: "id" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -66,8 +69,31 @@ export const clipsDb = {
   async put(hash: string, blob: Blob): Promise<void> {
     await run("clips", "readwrite", (s) => s.put({ hash, blob, createdAt: Date.now() } satisfies ClipRecord));
   },
+  async has(hash: string): Promise<boolean> {
+    return (await run<IDBValidKey | undefined>("clips", "readonly", (s) => s.getKey(hash))) !== undefined;
+  },
   count: () => run<number>("clips", "readonly", (s) => s.count()),
   async clear(): Promise<void> {
     await run("clips", "readwrite", (s) => s.clear());
+  },
+};
+
+export interface SavedSession {
+  id: "last";
+  wav: Blob;
+  duration: number;
+  segments: Segment[];
+  /** The word in each slot, in play order. */
+  slots: Word[];
+  listId: string;
+  languageCode: string;
+  title: string;
+  createdAt: number;
+}
+
+export const sessionsDb = {
+  get: () => run<SavedSession | undefined>("sessions", "readonly", (s) => s.get("last")),
+  async put(session: SavedSession): Promise<void> {
+    await run("sessions", "readwrite", (s) => s.put(session));
   },
 };
