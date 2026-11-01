@@ -1,4 +1,6 @@
 # Copy to .dev.vars for local development. Never commit .dev.vars.
 GOOGLE_TTS_API_KEY=your-google-cloud-api-key
-# Skips the Cloudflare Access check locally. Never set this in production.
+# Skips the Cloudflare Access and email checks locally. Never set this in production.
 AUTH_DISABLED=true
+# In production, set with: npx wrangler secret put ALLOWED_EMAILS
+# ALLOWED_EMAILS=you@example.com,friend@example.com

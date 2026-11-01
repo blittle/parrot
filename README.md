@@ -72,19 +72,26 @@ To also enable server mode:
 
 ```sh
 npx wrangler secret put GOOGLE_TTS_API_KEY
+npx wrangler secret put ALLOWED_EMAILS   # comma-separated, e.g. you@example.com,friend@example.com
 ```
+
+`ALLOWED_EMAILS` is a secret rather than a var so the addresses stay out of this
+public repo. The Worker checks every request's signed-in email against it, in
+addition to the Access policy below. Keep the two lists in sync.
 
 Then put the app behind **Cloudflare Access** (Zero Trust, free for up to 50 users):
 
 1. In the Cloudflare dashboard, open the `parrot` Worker → **Settings → Domains & Routes**
    and enable Cloudflare Access on the `workers.dev` route (or add a custom domain and
    create a self-hosted Access application for it under **Zero Trust → Access → Applications**).
-2. Add a policy that allows only your email (and anyone else you want).
+2. Add an **Allow** policy with an **Emails** rule listing the same addresses as `ALLOWED_EMAILS`.
+   Under login methods, the default "One-time PIN" (a code emailed to you) works with any
+   address; add Google as a login method if you'd rather sign in with your Google account.
 3. Copy the application's **Audience (AUD) tag** and your **team domain**
    (e.g. `yourteam.cloudflareaccess.com`) into `vars` in `wrangler.jsonc`.
 4. `npm run deploy` again.
 
-Until both vars are set, `/api/*` rejects every request with 401, so a
+Until both vars and `ALLOWED_EMAILS` are set, `/api/*` rejects every request with 401, so a
 misconfiguration can't expose the server key. If you want the site public for
 "own key" users but the server private, put Access on `/api/*` only.
 If you use a custom domain, disable the `workers.dev` and preview URLs so Access

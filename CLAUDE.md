@@ -7,7 +7,7 @@ Parrot is a language-learning app: import vocabulary lists, hear them via Google
 
 ## Two audio modes
 - **Own key:** the user's Google API key, stored in the browser, calls Google directly.
-- **Server:** no key set, so the app uses the Worker, which holds the key and must stay behind Cloudflare Access and fail closed (`worker/auth.ts`).
+- **Server:** no key set, so the app uses the Worker, which holds the key and must stay behind Cloudflare Access and fail closed (`worker/auth.ts`). The Worker also checks the signed-in email against the `ALLOWED_EMAILS` secret. Don't commit real email addresses: the repo is public.
 Both share the same cache key, so clips are interchangeable. Clips are cached in IndexedDB on every device.
 
 ## Rules
