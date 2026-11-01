@@ -1,10 +1,10 @@
-import type { TtsRequest } from "../shared/api";
+import type { TtsRequest } from "./api";
 
 export const MAX_TEXT_LENGTH = 500;
 export const MIN_RATE = 0.25;
 export const MAX_RATE = 2;
 
-const LANGUAGE_CODE = /^[a-z]{2,3}-[A-Z]{2}$/;
+export const LANGUAGE_CODE = /^[a-z]{2,3}-[A-Z]{2}$/;
 const VOICE_NAME = /^[A-Za-z0-9-]{1,80}$/;
 
 export type Validated =

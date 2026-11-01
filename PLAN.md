@@ -12,6 +12,8 @@ German first, French and Spanish possibly later.
 | Hosting | One Cloudflare Worker serving the SPA and `/api/*` | Keeps the API key server-side with minimal infrastructure |
 | Audio cache | R2, keyed by SHA-256 of (voice, rate, text) | Each clip is synthesized once and replayed for free |
 | Auth | Cloudflare Access in front of the app, JWT re-verified in the Worker | No auth code to maintain; the Worker fails closed if Access is misconfigured |
+| Bring your own key | Users can paste their own Google key; the browser calls Google directly | Lets anyone use the app without the owner paying for their usage |
+| Client storage | IndexedDB for lists and clips | Works offline, no account needed; sync can come later |
 | Frontend | Vite + React + TypeScript | |
 | Google auth | API key restricted to the Text-to-Speech API | Simplest option in a Worker; a service account JWT is possible later if needed |
 
@@ -39,8 +41,8 @@ Worker
 - Page to type German text and play it with every Google `de-DE` voice, at adjustable speed, with favorites.
 - Goal: pick a default voice (and maybe a second voice for variety) by ear.
 
-### 2. MVP: lists and sequences
-- Upload CSV or XLSX (SheetJS). Handle non-UTF-8 Excel exports so ä/ö/ü/ß survive.
+### 2. MVP: lists and sequences (done)
+- Upload CSV or XLSX (PapaParse, read-excel-file). Handle non-UTF-8 Excel exports so ä/ö/ü/ß survive.
 - Column mapping with a preview. Combine an optional article column with the noun ("der Hund").
 - Separate display text from spoken text: strip annotations like "(m.)" or "pl. -e" before synthesis.
 - Pre-generate all audio on upload with a progress bar, so playback never waits on the network.
@@ -52,13 +54,16 @@ Worker
 - Translation spoken with an English voice (or hidden for recall practice).
 - Lists stored locally (IndexedDB) for now.
 
-### 3. Hands-free listening
+### 3. Hands-free listening (done, except MP3 export)
 - Render a whole session (clips plus silences) into one audio file with `OfflineAudioContext`,
   so playback survives a locked phone screen (iOS throttles background timers).
 - Media Session API for lock screen controls and track info.
-- Download a session as an MP3 or WAV.
+- Download a session as WAV. MP3 would be about 10x smaller but needs an encoder (e.g. lamejs).
 
 ### 4. Later
+- Verify against real Google voices: does Chirp 3 HD accept `speakingRate`? If not, use
+  another family for slow steps, or slow down with longer pauses instead.
+- Export a list back to CSV.
 - Lists synced across devices (D1).
 - Mark words as known; spaced repetition ordering.
 - Record yourself and compare with the TTS clip.

@@ -1,4 +1,4 @@
-import type { TtsRequest } from "../shared/api";
+import type { TtsRequest } from "./api";
 
 // Bump when the synthesis output would change for the same inputs
 // (e.g. switching audio encoding), so old cache entries are not reused.

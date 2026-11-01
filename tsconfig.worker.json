@@ -14,5 +14,5 @@
     "noUnusedParameters": true
   },
   "include": ["worker", "shared"],
-  "exclude": ["worker/**/*.test.ts"]
+  "exclude": ["**/*.test.ts"]
 }

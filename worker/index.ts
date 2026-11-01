@@ -1,8 +1,8 @@
 import type { ApiError, TtsResponse, VoicesResponse } from "../shared/api";
 import { checkAccess, type AuthEnv } from "./auth";
-import { audioObjectKey, cacheKey, HASH_PATTERN } from "./cache-key";
-import { GoogleTtsError, listVoices, synthesize } from "./google";
-import { validateTtsRequest } from "./validate";
+import { audioObjectKey, cacheKey, HASH_PATTERN } from "../shared/cache-key";
+import { GoogleTtsError, listVoices, synthesize } from "../shared/google";
+import { LANGUAGE_CODE, validateTtsRequest } from "../shared/validate";
 
 interface Env extends AuthEnv {
   AUDIO: R2Bucket;
@@ -17,7 +17,6 @@ function error(message: string, status: number): Response {
   return json({ error: message } satisfies ApiError, status);
 }
 
-const LANGUAGE_CODE = /^[a-z]{2,3}-[A-Z]{2}$/;
 
 export default {
   async fetch(request, env): Promise<Response> {

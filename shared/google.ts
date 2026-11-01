@@ -1,4 +1,4 @@
-import type { TtsRequest, Voice } from "../shared/api";
+import type { TtsRequest, Voice } from "./api";
 
 const BASE = "https://texttospeech.googleapis.com/v1";
 
