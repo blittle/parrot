@@ -73,6 +73,9 @@ GitHub would make Cloudflare deploy on every push as well, doubling up with step
   npx wrangler r2 bucket create parrot-audio
   ```
 
+- [ ] If `r2 bucket create` asks "Would you like Wrangler to add it on your behalf?", answer
+  **no** (or press Ctrl+C). `wrangler.jsonc` already binds the bucket as `AUDIO`; letting
+  Wrangler add it creates a duplicate binding. If it slipped in, `git checkout wrangler.jsonc`.
 - [ ] Write down the **Account ID** that `wrangler whoami` prints (also shown on the
   **Workers & Pages** overview page). You need it in step 5.
 
