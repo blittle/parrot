@@ -1,4 +1,4 @@
-Parrot is a language-learning app: import vocabulary lists, hear them via Google Cloud TTS in customizable repetition sequences. The plan and milestones are in `PLAN.md`.
+Parrot is a language-learning app: import vocabulary lists, hear them via Google Cloud TTS in customizable repetition sequences. The plan and milestones are in `PLAN.md`; deployment steps in `DEPLOY.md` (keep it in sync with config changes).
 
 ## Layout
 - `src/`: Vite + React SPA. Pages in `src/pages/`, logic in `src/lib/` (pure modules have `*.test.ts` next to them).

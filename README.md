@@ -69,7 +69,7 @@ npm run typecheck
 ## Deploying to Cloudflare
 
 The full one-time checklist (Google key, Cloudflare account, R2, Access,
-GitHub secrets) is in the deployment checklist doc. In short:
+GitHub secrets, phone checks, troubleshooting) is in [DEPLOY.md](DEPLOY.md). In short:
 
 ```sh
 npx wrangler login
