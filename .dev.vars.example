@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+GOOGLE_TTS_API_KEY=your-google-cloud-api-key
+# Skips the Cloudflare Access check locally. Never set this in production.
+AUTH_DISABLED=true
