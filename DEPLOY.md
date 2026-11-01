@@ -53,9 +53,15 @@ Keep `parrot-server` handy for step 3.
 The Worker and R2 run on Cloudflare's free tier for personal use; R2 needs a payment
 method on file but includes 10 GB free.
 
+**Don't create an application in the dashboard.** The `parrot` Worker is created by
+`npm run deploy` in step 3, from the settings in `wrangler.jsonc`. If the dashboard shows
+"Make something new" (Connect GitHub, Hello World, template, upload), close it. (Connect
+GitHub would make Cloudflare deploy on every push as well, doubling up with step 5.)
+
 - [ ] Sign up or log in at [dash.cloudflare.com](https://dash.cloudflare.com).
-- [ ] **Workers & Pages**: open it once and pick your `workers.dev` subdomain.
-  The app's address becomes `https://parrot.<subdomain>.workers.dev`.
+- [ ] **Workers & Pages**: if asked, pick your `workers.dev` subdomain. The app's address
+  becomes `https://parrot.<subdomain>.workers.dev`. Not asked? You already have one; it's
+  shown on the Workers & Pages overview, and `npm run deploy` prints the full address.
 - [ ] **R2 Object Storage**: open it once and enable R2.
 - [ ] On your laptop, in the `parrot` folder:
 
