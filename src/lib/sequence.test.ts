@@ -75,3 +75,19 @@ describe("shuffle", () => {
     expect(shuffle([1, 2, 3, 4], () => 0.3).sort()).toEqual([1, 2, 3, 4]);
   });
 });
+
+describe("keepSlots", () => {
+  it("drops slots and renumbers the rest", async () => {
+    const { keepSlots } = await import("./sequence");
+    const plan = buildPlan(list, PRESETS[3], { ...DEFAULT_OPTIONS, loops: 2 }, voices);
+    // Quick review: term + translation per word; 3 words x 2 loops = 6 slots.
+    expect(plan.slots).toHaveLength(6);
+    const kept = keepSlots(plan, (slot) => plan.slots[slot].id !== "b");
+    expect(kept.slots.map((w) => w.id)).toEqual(["a", "c", "a", "c"]);
+    expect(new Set(kept.items.map((i) => i.slot))).toEqual(new Set([0, 1, 2, 3]));
+    expect(kept.items.some((i) => i.kind === "clip" && i.req.text === "die Katze")).toBe(false);
+    // Items stay in order within each slot.
+    const slots = kept.items.map((i) => i.slot);
+    expect([...slots].sort((x, y) => x - y)).toEqual(slots);
+  });
+});

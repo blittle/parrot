@@ -164,3 +164,17 @@ export function uniqueClips(plan: Plan): Required<TtsRequest>[] {
   }
   return [...seen.values()];
 }
+
+/** A plan with only the given slots kept, renumbered in order. */
+export function keepSlots(plan: Plan, keep: (slot: number) => boolean): Plan {
+  const renumber = new Map<number, number>();
+  const slots: Word[] = [];
+  plan.slots.forEach((word, i) => {
+    if (keep(i)) {
+      renumber.set(i, slots.length);
+      slots.push(word);
+    }
+  });
+  const items = plan.items.filter((item) => renumber.has(item.slot)).map((item) => ({ ...item, slot: renumber.get(item.slot)! }));
+  return { items, slots };
+}

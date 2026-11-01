@@ -10,6 +10,17 @@ export class HttpError extends Error {
   }
 }
 
+/** Google's quota was still exhausted after retrying (or retrying was off). */
+export class QuotaError extends Error {
+  readonly status = 429;
+}
+
+/** A clip is being downloaded in the background (maybe waiting on the quota), not ready yet. */
+export class PendingError extends Error {}
+
+/** A clip isn't saved on this device and there's no connection to fetch it. */
+export class OfflineError extends Error {}
+
 /** True for "too many requests" / quota errors from Google or the Parrot server. */
 export function isRateLimit(err: unknown): boolean {
   if (typeof err === "object" && err !== null && (err as { status?: unknown }).status === 429) return true;

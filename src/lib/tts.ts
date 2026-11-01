@@ -2,7 +2,7 @@ import type { ApiError, TtsRequest, TtsResponse, Voice, VoicesResponse } from ".
 import { cacheKey } from "../../shared/cache-key";
 import { GoogleTtsError, listVoices as googleListVoices, synthesize as googleSynthesize } from "../../shared/google";
 import { clipsDb } from "./db";
-import { HttpError, isRateLimit, withRetry } from "./retry";
+import { HttpError, isRateLimit, OfflineError, PendingError, QuotaError, withRetry } from "./retry";
 import { getSettings } from "./settings";
 
 export type Mode = "own-key" | "server";
@@ -15,7 +15,7 @@ export function currentMode(): Mode {
 function explain(err: unknown, mode: Mode): Error {
   const message = err instanceof Error ? err.message : String(err);
   if (isRateLimit(err)) {
-    return new Error("Google's usage limit is still reached. Wait a minute and try again, or raise the Text-to-Speech quota in Google Cloud.");
+    return new QuotaError("Google's usage limit is still reached. Wait a minute and try again, or raise the Text-to-Speech quota in Google Cloud.");
   }
   if (mode === "server" && /Cloudflare Access|Unauthorized|401/.test(message)) {
     return new Error("No API key set. Add your own Google API key in Settings, or sign in to the Parrot server.");
@@ -111,12 +111,35 @@ export interface Clip {
 
 const inflight = new Map<string, Promise<Clip>>();
 
+// Google allows 200 Chirp 3 HD requests per minute by default. Spacing requests
+// ~330 ms apart (about 180 a minute) keeps big downloads under that limit.
+const MIN_REQUEST_GAP_MS = 330;
+let nextRequestAt = 0;
+
+/** Waits for this client's next request slot. */
+function paceRequest(): Promise<void> {
+  const now = Date.now();
+  const at = Math.max(now, nextRequestAt);
+  nextRequestAt = at + MIN_REQUEST_GAP_MS;
+  return at > now ? new Promise((r) => setTimeout(r, at - now)) : Promise.resolve();
+}
+
+export interface GetClipOptions {
+  /** Called when Google's quota is hit and the download pauses before retrying. */
+  onWait?: (ms: number) => void;
+  /** Wait out quota errors (default). Off = fail fast so a session can start with what's ready. */
+  retry?: boolean;
+}
+
 /** Returns audio for a request: from IndexedDB if we have it, otherwise synthesized and stored. */
-/** `onWait` is called when Google's quota is hit and the download pauses before retrying. */
-export async function getClip(req: Required<TtsRequest>, onWait?: (ms: number) => void): Promise<Clip> {
+export async function getClip(req: Required<TtsRequest>, { onWait, retry = true }: GetClipOptions = {}): Promise<Clip> {
   const hash = await cacheKey(req);
   const existing = inflight.get(hash);
-  if (existing) return existing;
+  if (existing) {
+    // A caller that can't wait (a session starting now) doesn't join a slow background download.
+    if (!retry) throw new PendingError("This audio is still downloading.");
+    return existing;
+  }
 
   const promise = (async (): Promise<Clip> => {
     const local = await clipsDb.get(hash);
@@ -126,6 +149,7 @@ export async function getClip(req: Required<TtsRequest>, onWait?: (ms: number) =
     let blob: Blob;
     try {
       blob = await withRetry(async () => {
+        await paceRequest();
         if (mode === "own-key") {
           const bytes = await googleSynthesize(req, getSettings().apiKey);
           return new Blob([bytes as BlobPart], { type: "audio/mpeg" });
@@ -138,10 +162,10 @@ export async function getClip(req: Required<TtsRequest>, onWait?: (ms: number) =
         const audio = await fetch(res.url);
         if (!audio.ok) throw new HttpError(`Could not download audio (${audio.status})`, audio.status);
         return audio.blob();
-      }, { onWait });
+      }, { onWait, delays: retry ? undefined : [] });
     } catch (err) {
       if (!navigator.onLine || err instanceof TypeError) {
-        throw new Error("Some audio isn't downloaded yet, and you're offline. Connect once to download it.");
+        throw new OfflineError("Some audio isn't downloaded yet, and you're offline. Connect once to download it.");
       }
       throw explain(err, mode);
     }
@@ -169,7 +193,7 @@ export async function getClips(
     while (next < reqs.length && failed === undefined) {
       const i = next++;
       try {
-        results[i] = await getClip(reqs[i], () => onProgress(done, reqs.length, true));
+        results[i] = await getClip(reqs[i], { onWait: () => onProgress(done, reqs.length, true) });
       } catch (err) {
         failed ??= err;
         return;
@@ -181,4 +205,53 @@ export async function getClips(
   await Promise.all(Array.from({ length: Math.min(concurrency, reqs.length) }, worker));
   if (failed !== undefined) throw failed;
   return results;
+}
+
+export interface SettledClips {
+  /** Clips that are ready, by index into the request list. */
+  clips: Map<number, Clip>;
+  /** Indexes that couldn't be fetched. */
+  failed: Set<number>;
+  /** The first error, to explain why. */
+  error?: unknown;
+}
+
+/**
+ * Like getClips, but keeps going past failures and reports what's ready.
+ * After a quota or offline error it stops sending requests (they'd fail too)
+ * and marks the rest as failed.
+ */
+export async function getClipsSettled(
+  reqs: Required<TtsRequest>[],
+  onProgress: (done: number, total: number, waiting?: boolean) => void,
+  { retry = true, concurrency = 3 }: { retry?: boolean; concurrency?: number } = {},
+): Promise<SettledClips> {
+  const clips = new Map<number, Clip>();
+  const failed = new Set<number>();
+  let error: unknown;
+  let stop = false;
+  let next = 0;
+  let done = 0;
+  onProgress(0, reqs.length);
+
+  async function worker() {
+    while (next < reqs.length) {
+      const i = next++;
+      if (stop) {
+        failed.add(i);
+        continue;
+      }
+      try {
+        clips.set(i, await getClip(reqs[i], { retry, onWait: () => onProgress(done, reqs.length, true) }));
+      } catch (err) {
+        failed.add(i);
+        error ??= err;
+        if (err instanceof QuotaError || err instanceof OfflineError) stop = true;
+      }
+      onProgress(++done, reqs.length);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, reqs.length) }, worker));
+  return { clips, failed, error };
 }

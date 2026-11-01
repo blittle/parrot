@@ -4,7 +4,9 @@ import { Parrot } from "../components/Parrot";
 import { VoiceSelect } from "../components/VoiceSelect";
 import { listsDb, sessionsDb, type SavedSession } from "../lib/db";
 import { greeting } from "../lib/languages";
+import { startDownload } from "../lib/offline";
 import { loadPractice, savePractice, type PracticeSettings } from "../lib/practice";
+import { preparePlan, type PreparedPlan } from "../lib/prepare";
 import { estimateSeconds, renderSession, type RenderProgress } from "../lib/render";
 import { href, navigate } from "../lib/router";
 import { buildPlan, PRESETS, selectWords, type SessionOptions, type Step } from "../lib/sequence";
@@ -29,6 +31,7 @@ export function PracticePage({ listId }: { listId?: string }) {
   const [progress, setProgress] = useState<RenderProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ data: SavedSession; fresh: boolean } | null>(null);
+  const [partial, setPartial] = useState<PreparedPlan | null>(null);
   const streak = currentStreak(loadStreak().days, localDate());
 
   useEffect(() => {
@@ -62,6 +65,7 @@ export function PracticePage({ listId }: { listId?: string }) {
   async function start() {
     if (!list) return;
     setError(null);
+    setPartial(null);
     if (estimate > 90 * 60 && !confirm(`This session is about ${formatDuration(estimate)} long. Continue?`)) return;
     try {
       setProgress({ phase: "audio", done: 0, total: 0 });
@@ -69,8 +73,17 @@ export function PracticePage({ listId }: { listId?: string }) {
         resolveVoice(list.languageCode),
         usesTranslation ? resolveVoice(list.translationLanguageCode) : Promise.resolve(""),
       ]);
-      const plan = buildPlan(list, sequence, options, { term, translation });
-      if (!plan.items.some((i) => i.kind === "clip")) throw new Error("Nothing to play. Check the word range and sequence steps.");
+      const fullPlan = buildPlan(list, sequence, options, { term, translation });
+      if (!fullPlan.items.some((i) => i.kind === "clip")) throw new Error("Nothing to play. Check the word range and sequence steps.");
+      // Start with whatever audio is ready; words still downloading are left out.
+      const prepared = await preparePlan(fullPlan, setProgress);
+      const plan = prepared.plan;
+      if (!plan.items.some((i) => i.kind === "clip")) throw prepared.error ?? new Error("No audio is available for this list yet.");
+      if (prepared.skippedWords > 0) {
+        setPartial(prepared);
+        // Keep fetching the rest in the background so the next session has them.
+        if (navigator.onLine) startDownload(list).catch(() => {});
+      }
       const rendered = await renderSession(plan, setProgress);
       const data: SavedSession = {
         id: "last",
@@ -109,6 +122,18 @@ export function PracticePage({ listId }: { listId?: string }) {
   return (
     <>
       {session && <Player key={session.data.createdAt} session={session.data} autoPlay={session.fresh} />}
+      {session && partial && (
+        <div className="notice">
+          Playing {partial.keptWords} of {partial.keptWords + partial.skippedWords} words.{" "}
+          {partial.reason === "offline"
+            ? `The other ${partial.skippedWords} aren't downloaded yet; connect to the internet to get them.`
+            : partial.reason === "quota"
+              ? `The other ${partial.skippedWords} are still downloading (Google's per-minute limit) and will be in your next session.`
+              : partial.reason === "downloading"
+                ? `The other ${partial.skippedWords} are still downloading and will be in your next session.`
+                : `The other ${partial.skippedWords} couldn't be downloaded right now and will be retried.`}
+        </div>
+      )}
 
       {!session && (
         <div className="hello">

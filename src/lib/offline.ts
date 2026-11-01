@@ -69,3 +69,44 @@ export async function downloadForOffline(list: WordList, onProgress: (status: Of
   onProgress({ ready: already, total: reqs.length });
   await getClips(missing, (done, _total, waiting) => onProgress({ ready: already + done, total: reqs.length, waiting }));
 }
+
+// Downloads keep running when you leave a screen. This registry lets any
+// screen (the list page, the lists overview) follow a download already in
+// progress instead of showing stale numbers or starting a second one.
+
+interface ActiveDownload {
+  status: OfflineStatus;
+  promise: Promise<void>;
+  listeners: Set<(status: OfflineStatus | null) => void>;
+}
+
+const active = new Map<string, ActiveDownload>();
+
+/** Starts downloading a list's audio, or returns the download already running. */
+export function startDownload(list: WordList): Promise<void> {
+  const running = active.get(list.id);
+  if (running) return running.promise;
+  const entry: ActiveDownload = { status: { ready: 0, total: 0 }, promise: Promise.resolve(), listeners: new Set() };
+  entry.promise = downloadForOffline(list, (status) => {
+    entry.status = status;
+    entry.listeners.forEach((l) => l(status));
+  }).finally(() => {
+    active.delete(list.id);
+    entry.listeners.forEach((l) => l(null));
+  });
+  active.set(list.id, entry);
+  return entry.promise;
+}
+
+/** The running download for a list, if any. */
+export function activeDownload(listId: string): { status: OfflineStatus; promise: Promise<void> } | undefined {
+  return active.get(listId);
+}
+
+/** Follows a running download's progress; `null` means it finished or failed. Returns unsubscribe. */
+export function followDownload(listId: string, listener: (status: OfflineStatus | null) => void): () => void {
+  const entry = active.get(listId);
+  if (!entry) return () => {};
+  entry.listeners.add(listener);
+  return () => entry.listeners.delete(listener);
+}
